@@ -5,6 +5,9 @@ export default class CharacterScene extends Phaser.Scene {
   constructor() { super('CharacterScene'); }
 
   create() {
+    // Defensiver Cleanup: falls ein vorheriger Input-Leak im DOM steckt
+    document.getElementById('ygg-name-input')?.remove();
+
     const W = this.scale.width, H = this.scale.height;
     const cx = W / 2;
 

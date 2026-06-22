@@ -63,10 +63,10 @@ export default class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5, 1).setAlpha(0);
     allObjs.push(statsT);
 
-    // Restart button
-    const btn1W = 220, btn1H = 50;
-    const btn1X = cx - btn1W / 2 - 10;
-    const btn1Y = cy + 120;
+    // Restart button (oben)
+    const btn1W = 280, btn1H = 50;
+    const btn1X = cx - btn1W / 2;
+    const btn1Y = cy + 108;
 
     const btn1Gfx = this.add.graphics().setAlpha(0);
     drawButton(btn1Gfx, btn1X, btn1Y, btn1W, btn1H, false);
@@ -85,10 +85,10 @@ export default class GameOverScene extends Phaser.Scene {
     btn1Hit.on('pointerout',  () => { btn1Gfx.clear(); drawButton(btn1Gfx, btn1X, btn1Y, btn1W, btn1H, false); btn1Label.setStyle({ ...TEXT_STYLES.button, color: '#ffffff' }); });
     btn1Hit.on('pointerdown', () => this.scene.start('DungeonScene'));
 
-    // Menu button
-    const btn2W = 200, btn2H = 50;
-    const btn2X = cx + 10;
-    const btn2Y = cy + 120;
+    // Menu button (unten)
+    const btn2W = 240, btn2H = 44;
+    const btn2X = cx - btn2W / 2;
+    const btn2Y = cy + 170;
 
     const btn2Gfx = this.add.graphics().setAlpha(0);
     drawButton(btn2Gfx, btn2X, btn2Y, btn2W, btn2H, false);
