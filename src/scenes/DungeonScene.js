@@ -10,6 +10,8 @@ import VirtualJoystick from '../ui/VirtualJoystick.js';
 import SkillButtons from '../ui/SkillButtons.js';
 import HUD from '../ui/HUD.js';
 import LevelUpUI from '../ui/LevelUpUI.js';
+import Chest from '../entities/Chest.js';
+import GodSpeechUI from '../ui/GodSpeechUI.js';
 import { WEAPONS, PASSIVES } from '../data/weapons.js';
 
 const WORLD_SIZE = 4000;
@@ -72,6 +74,17 @@ export default class DungeonScene extends Phaser.Scene {
     this._skillButtons = new SkillButtons(this);
     this._hud = new HUD(this);
     this._levelUpUI = new LevelUpUI(this);
+    this._godSpeechUI = new GodSpeechUI(this);
+
+    this._chests = [];
+    this._spawnChests(5);
+    this.time.addEvent({
+      delay: 60000,
+      loop: true,
+      callback: () => {
+        if (this._chests.length < 3) this._spawnChests(1);
+      }
+    });
 
     this._dashCooldown = false;
     this._skillButtons.onSkill(0, () => this._doDash());
@@ -211,20 +224,82 @@ export default class DungeonScene extends Phaser.Scene {
       this._spawnEnemy();
       this._nextSpawnTime = time + this._spawnInterval;
     }
+
+    // Chest proximity check
+    if (this._chests) {
+      for (let i = this._chests.length - 1; i >= 0; i--) {
+        const chest = this._chests[i];
+        if (chest.isNear(this._player.x, this._player.y)) {
+          const loot = chest.open();
+          if (loot) {
+            this._chests.splice(i, 1);
+            this._applyLoot(loot);
+            this.time.delayedCall(30000, () => this._spawnChests(1));
+          }
+        }
+      }
+    }
   }
 
   _onLevelUp() {
     this._levelUpPending = true;
     const options = this._buildLevelUpOptions();
-    this._levelUpUI.show(options, (choice) => {
-      this._applyLevelUpChoice(choice);
-      this._levelUpPending = false;
+    this._godSpeechUI.show(() => {
+      this._levelUpUI.show(options, (choice) => {
+        this._applyLevelUpChoice(choice);
+        this._levelUpPending = false;
 
-      const evos = this._evolutionSystem.checkAll(this._player);
-      evos.forEach(({ weaponSlot, evo }) => {
-        this._evolutionSystem.apply(this._player, weaponSlot, evo);
-        this._showEvolutionNotice(evo);
+        const evos = this._evolutionSystem.checkAll(this._player);
+        evos.forEach(({ weaponSlot, evo }) => {
+          this._evolutionSystem.apply(this._player, weaponSlot, evo);
+          this._showEvolutionNotice(evo);
+        });
       });
+    });
+  }
+
+  _spawnChests(count) {
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
+      const dist = 300 + Math.random() * 1200;
+      const cx = this._player ? this._player.x : 2000;
+      const cy = this._player ? this._player.y : 2000;
+      const x = Phaser.Math.Clamp(cx + Math.cos(angle) * dist, 50, WORLD_SIZE - 50);
+      const y = Phaser.Math.Clamp(cy + Math.sin(angle) * dist, 50, WORLD_SIZE - 50);
+      this._chests.push(new Chest(this, x, y));
+    }
+  }
+
+  _applyLoot(loot) {
+    const p = this._player;
+    const effect = loot.effect;
+    if (effect.healAmount) p.hp = Math.min(p.maxHp, (p.hp || 0) + effect.healAmount);
+    if (effect.maxHpBonus) {
+      p.maxHp = (p.maxHp || 100) + effect.maxHpBonus;
+      p.hp = (p.hp || 0) + effect.maxHpBonus;
+    }
+    if (effect.speedBonus) p.speed = (p.speed || 160) * (1 + effect.speedBonus);
+    if (effect.xpBonus) p._xpBonus = ((p._xpBonus || 0) + effect.xpBonus);
+    this._showLootToast(loot);
+  }
+
+  _showLootToast(loot) {
+    const cam = this.cameras.main;
+    const W = cam.width;
+    const toast = this.add.text(W / 2, 80, `${loot.icon} ${loot.name} — ${loot.desc}`, {
+      fontSize: '16px', color: '#d4af37', fontFamily: 'serif',
+      stroke: '#000000', strokeThickness: 3,
+      backgroundColor: '#1a000066', padding: { x: 12, y: 6 }
+    }).setOrigin(0.5).setDepth(95).setScrollFactor(0).setAlpha(0);
+
+    this.tweens.add({
+      targets: toast,
+      alpha: 1,
+      y: 70,
+      duration: 300,
+      hold: 2000,
+      yoyo: true,
+      onComplete: () => toast.destroy()
     });
   }
 
