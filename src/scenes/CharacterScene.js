@@ -1,148 +1,157 @@
+import { COLORS, TEXT_STYLES, drawGrid, drawPanel, drawPanelGold, drawButton } from '../data/design-system.js';
+import { CHARACTER_CREATION } from '../data/copy.js';
+
 export default class CharacterScene extends Phaser.Scene {
   constructor() { super('CharacterScene'); }
 
   create() {
     const W = this.scale.width, H = this.scale.height;
-    const cx = W / 2, cy = H / 2;
+    const cx = W / 2;
 
     this._selectedClass = 'krieger';
     this._nameInput = null;
+    this._styleTag = null;
 
+    // --- Background ---
     const bg = this.add.graphics();
-    bg.fillStyle(0x08010f);
+    bg.fillStyle(COLORS.void, 1);
     bg.fillRect(0, 0, W, H);
-    bg.lineStyle(1, 0x330066, 0.15);
-    for (let x = 0; x <= W; x += 48) bg.lineBetween(x, 0, x, H);
-    for (let y = 0; y <= H; y += 48) bg.lineBetween(0, y, W, y);
+    const gridGfx = this.add.graphics();
+    drawGrid(gridGfx, W, H);
 
-    this.add.text(cx, 38, 'KRIEGER DES NORDENS', {
-      fontSize: '36px', color: '#d4af37', fontStyle: 'bold', fontFamily: 'serif',
-      shadow: { offsetX: 0, offsetY: 0, color: '#ff8800', blur: 24, fill: true }
-    }).setOrigin(0.5);
+    // --- Title ---
+    this.add.text(cx, 38, CHARACTER_CREATION.title, TEXT_STYLES.heading)
+      .setOrigin(0.5);
 
-    this.add.text(cx, 72, 'Wähle deinen Weg durch Yggdrasil', {
-      fontSize: '14px', color: '#886644', fontFamily: 'serif'
-    }).setOrigin(0.5);
+    // --- Subtitle ---
+    this.add.text(cx, 68, CHARACTER_CREATION.subtitle, TEXT_STYLES.caption)
+      .setOrigin(0.5);
 
-    this.add.text(cx - 200, 106, 'Dein Name, Krieger:', {
-      fontSize: '13px', color: '#aaaaaa', fontFamily: 'sans-serif'
-    }).setOrigin(0, 0.5);
+    // --- Name input label ---
+    this.add.text(cx, 100, CHARACTER_CREATION.nameLabel, TEXT_STYLES.stat)
+      .setOrigin(0.5);
+
+    // Style the HTML input
+    const styleTag = document.createElement('style');
+    styleTag.textContent = '#ygg-name-input { background: #0d0520; border: 1.5px solid #d4af37; border-radius: 6px; color: #f0d060; font-family: \'Cinzel\', serif; font-size: 18px; padding: 10px 16px; outline: none; width: 320px; text-align: center; }';
+    document.head.appendChild(styleTag);
+    this._styleTag = styleTag;
 
     const input = document.createElement('input');
     input.type = 'text';
-    input.placeholder = 'Krieger';
+    input.id = 'ygg-name-input';
+    input.placeholder = CHARACTER_CREATION.namePlaceholder;
     input.maxLength = 20;
     Object.assign(input.style, {
       position: 'absolute',
-      background: '#0d0020',
-      border: '1px solid #6633aa',
-      borderRadius: '4px',
-      color: '#d4af37',
-      fontSize: '14px',
-      padding: '4px 10px',
-      outline: 'none',
-      fontFamily: 'sans-serif',
-      width: '180px',
-      zIndex: '10'
+      zIndex: '10',
     });
     document.body.appendChild(input);
     this._nameInput = input;
 
+    // Position input over canvas
     const canvas = this.sys.game.canvas;
     const rect = canvas.getBoundingClientRect();
     const scaleX = rect.width / W;
     const scaleY = rect.height / H;
-    input.style.left = (rect.left + (cx + 10) * scaleX) + 'px';
-    input.style.top = (rect.top + (99) * scaleY) + 'px';
-    input.style.width = (180 * scaleX) + 'px';
-    input.style.height = (22 * scaleY) + 'px';
+    input.style.left = (rect.left + (cx - 160) * scaleX) + 'px';
+    input.style.top  = (rect.top  + (114) * scaleY) + 'px';
+    input.style.width = (320 * scaleX) + 'px';
 
-    const classes = [
-      { id: 'krieger', icon: '⚔', name: 'Krieger', sub: 'Stark & Unaufhaltsam', stats: 'HP 120 · DMG ×1.2' },
-      { id: 'schatten', icon: '🏹', name: 'Schattenjäger', sub: 'Schnell & Präzise', stats: 'HP 80 · SPD ×1.3' },
-      { id: 'runen', icon: '🔮', name: 'Runenmagier', sub: 'Mächtige Runen', stats: 'HP 70 · DMG ×1.5' }
-    ];
+    // --- Class cards ---
+    const classKeys = ['krieger', 'schatten', 'magier'];
+    const cardW = 185, cardH = 220;
+    const gap = 20;
+    const totalW = classKeys.length * cardW + (classKeys.length - 1) * gap;
+    const startX = cx - totalW / 2 + cardW / 2;
+    const cardCY = H / 2 + 60;
 
     this._cardGraphics = [];
-    this._cardObjects = [];
 
-    const cardW = 180, cardH = 200;
-    const totalW = classes.length * cardW + (classes.length - 1) * 20;
-    const startX = cx - totalW / 2 + cardW / 2;
-    const cardY = cy + 30;
-
-    classes.forEach((cls, i) => {
-      const cardX = startX + i * (cardW + 20);
-      const isSelected = cls.id === this._selectedClass;
+    classKeys.forEach((key, i) => {
+      const cls = CHARACTER_CREATION.classes[key];
+      const cardX = startX + i * (cardW + gap);
+      const isSelected = key === this._selectedClass;
+      const rx = cardX - cardW / 2;
+      const ry = cardCY - cardH / 2;
 
       const cardGfx = this.add.graphics();
-      this._drawCard(cardGfx, cardX, cardY, cardW, cardH, isSelected);
-      this._cardGraphics.push({ gfx: cardGfx, x: cardX, y: cardY, id: cls.id });
+      if (isSelected) drawPanelGold(cardGfx, rx, ry, cardW, cardH);
+      else            drawPanel(cardGfx, rx, ry, cardW, cardH);
+      this._cardGraphics.push({ gfx: cardGfx, x: rx, y: ry, w: cardW, h: cardH, id: key });
 
-      const icon = this.add.text(cardX, cardY - 60, cls.icon, { fontSize: '32px' }).setOrigin(0.5);
-      const nameT = this.add.text(cardX, cardY - 18, cls.name, {
-        fontSize: '15px', color: '#ffffff', fontStyle: 'bold', fontFamily: 'sans-serif'
-      }).setOrigin(0.5);
-      const subT = this.add.text(cardX, cardY + 14, cls.sub, {
-        fontSize: '11px', color: '#aaaaaa', fontFamily: 'sans-serif'
-      }).setOrigin(0.5);
-      const statsT = this.add.text(cardX, cardY + 52, cls.stats, {
-        fontSize: '11px', color: '#d4af37', fontFamily: 'monospace'
-      }).setOrigin(0.5);
+      // Icon
+      this.add.text(cardX, ry + 28, cls.icon, { ...TEXT_STYLES.heading, fontSize: '32px' })
+        .setOrigin(0.5);
 
-      const hitArea = this.add.rectangle(cardX, cardY, cardW, cardH, 0x000000, 0)
+      // Class name
+      this.add.text(cardX, ry + 66, cls.name, TEXT_STYLES.cardTitle)
+        .setOrigin(0.5);
+
+      // Epithet
+      this.add.text(cardX, ry + 88, cls.epithet, TEXT_STYLES.caption)
+        .setOrigin(0.5);
+
+      // Description
+      this.add.text(cardX, ry + 110, cls.desc,
+        { ...TEXT_STYLES.cardBody, wordWrap: { width: cardW - 24 }, align: 'center' })
+        .setOrigin(0.5, 0);
+
+      // Stats
+      this.add.text(cardX, ry + cardH - 12, cls.stats,
+        { ...TEXT_STYLES.stat, fontSize: '10px' })
+        .setOrigin(0.5, 1);
+
+      // Hit area
+      const hit = this.add.rectangle(cardX, cardCY, cardW, cardH, 0x000000, 0)
         .setInteractive({ useHandCursor: true });
-
-      hitArea.on('pointerdown', () => {
-        this._selectedClass = cls.id;
+      hit.on('pointerdown', () => {
+        this._selectedClass = key;
         this._cardGraphics.forEach(c => {
           c.gfx.clear();
-          this._drawCard(c.gfx, c.x, c.y, cardW, cardH, c.id === this._selectedClass);
+          if (c.id === this._selectedClass) drawPanelGold(c.gfx, c.x, c.y, c.w, c.h);
+          else                               drawPanel(c.gfx, c.x, c.y, c.w, c.h);
         });
       });
-
-      this._cardObjects.push(icon, nameT, subT, statsT, hitArea);
     });
 
-    const btnX = W - 120, btnY = H - 40;
+    // --- Continue button ---
+    const btnW = 260, btnH = 52;
+    const btnX = cx - btnW / 2;
+    const btnY = H - 70;
+
     const btnGfx = this.add.graphics();
-    btnGfx.fillStyle(0x2a0050, 0.95);
-    btnGfx.fillRoundedRect(btnX - 100, btnY - 22, 200, 44, 8);
-    btnGfx.lineStyle(2, 0xd4af37);
-    btnGfx.strokeRoundedRect(btnX - 100, btnY - 22, 200, 44, 8);
+    drawButton(btnGfx, btnX, btnY, btnW, btnH, false);
 
-    const btnT = this.add.text(btnX, btnY, 'WEITER →', {
-      fontSize: '16px', color: '#d4af37', fontStyle: 'bold', fontFamily: 'sans-serif'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    const btnLabel = this.add.text(cx, btnY + btnH / 2, CHARACTER_CREATION.continueButton, TEXT_STYLES.button)
+      .setOrigin(0.5);
 
-    btnT.on('pointerover', () => btnT.setStyle({ color: '#ffffff' }));
-    btnT.on('pointerout', () => btnT.setStyle({ color: '#d4af37' }));
-    btnT.on('pointerdown', () => {
-      const name = this._nameInput.value.trim() || 'Krieger';
-      localStorage.setItem('ygg_player', JSON.stringify({ name, class: this._selectedClass }));
+    const btnHit = this.add.rectangle(cx, btnY + btnH / 2, btnW, btnH, 0x000000, 0)
+      .setInteractive({ useHandCursor: true });
+
+    btnHit.on('pointerover', () => {
+      btnGfx.clear();
+      drawButton(btnGfx, btnX, btnY, btnW, btnH, true);
+      btnLabel.setStyle({ ...TEXT_STYLES.button, color: COLORS.goldCSS });
+    });
+    btnHit.on('pointerout', () => {
+      btnGfx.clear();
+      drawButton(btnGfx, btnX, btnY, btnW, btnH, false);
+      btnLabel.setStyle({ ...TEXT_STYLES.button, color: '#ffffff' });
+    });
+    btnHit.on('pointerdown', () => {
+      const name = this._nameInput ? this._nameInput.value.trim() : '';
+      localStorage.setItem('ygg_player', JSON.stringify({ name: name || 'Krieger', class: this._selectedClass }));
       this._cleanup();
       this.scene.start('TutorialScene');
     });
   }
 
-  _drawCard(gfx, x, y, w, h, selected) {
-    gfx.fillStyle(0x12003a, 0.95);
-    gfx.fillRoundedRect(x - w / 2, y - h / 2, w, h, 10);
-    if (selected) {
-      gfx.lineStyle(2, 0xd4af37);
-    } else {
-      gfx.lineStyle(1, 0x6633aa);
-    }
-    gfx.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 10);
-  }
-
   _cleanup() {
-    if (this._nameInput) {
-      this._nameInput.remove();
-      this._nameInput = null;
-    }
+    if (this._nameInput) { this._nameInput.remove(); this._nameInput = null; }
+    if (this._styleTag)  { this._styleTag.remove();  this._styleTag = null; }
   }
 
   shutdown() { this._cleanup(); }
-  destroy() { this._cleanup(); }
+  destroy()  { this._cleanup(); }
 }

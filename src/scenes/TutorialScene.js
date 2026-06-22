@@ -1,3 +1,6 @@
+import { COLORS, TEXT_STYLES, drawGrid, drawPanel, drawButton } from '../data/design-system.js';
+import { TUTORIAL } from '../data/copy.js';
+
 export default class TutorialScene extends Phaser.Scene {
   constructor() { super('TutorialScene'); }
 
@@ -6,44 +9,61 @@ export default class TutorialScene extends Phaser.Scene {
     const cx = W / 2, cy = H / 2;
 
     this._page = 0;
-    this._cards = [
-      { title: 'BEWEGE DICH', icon: '🕹', body: 'Linke Seite: Virtueller Joystick zum Laufen\nRechte Seite: Fähigkeiten aktivieren' },
-      { title: 'KÄMPFE AUTO', icon: '⚔', body: 'Dein Krieger greift automatisch an.\nWeiche Angriffen aus!' },
-      { title: 'LEVEL UP', icon: '✦', body: 'Töte Feinde → Sammle XP\nWähle neue Fähigkeiten & Waffen' },
-      { title: 'ÜBERLEBE', icon: '💀', body: 'Feinde werden stärker.\nEntwickle deine Waffen.\nBesiege Fenrir!' }
-    ];
 
+    // --- Static background ---
     const bg = this.add.graphics();
-    bg.fillStyle(0x08010f);
+    bg.fillStyle(COLORS.void, 1);
     bg.fillRect(0, 0, W, H);
-    bg.lineStyle(1, 0x330066, 0.15);
-    for (let x = 0; x <= W; x += 48) bg.lineBetween(x, 0, x, H);
-    for (let y = 0; y <= H; y += 48) bg.lineBetween(0, y, W, y);
+    const gridGfx = this.add.graphics();
+    drawGrid(gridGfx, W, H);
 
+    // --- Dynamic card layer ---
     this._cardGfx = this.add.graphics();
-    this._iconT = this.add.text(cx, cy - 80, '', { fontSize: '48px' }).setOrigin(0.5);
-    this._titleT = this.add.text(cx, cy - 20, '', {
-      fontSize: '28px', color: '#d4af37', fontStyle: 'bold', fontFamily: 'serif',
-      shadow: { offsetX: 0, offsetY: 0, color: '#ff8800', blur: 16, fill: true }
-    }).setOrigin(0.5);
-    this._bodyT = this.add.text(cx, cy + 40, '', {
-      fontSize: '15px', color: '#cccccc', fontFamily: 'sans-serif', align: 'center', lineSpacing: 6
-    }).setOrigin(0.5);
 
+    // --- Progress indicator (top-right) ---
+    this._progressT = this.add.text(W - 16, 16, '', TEXT_STYLES.tiny)
+      .setOrigin(1, 0);
+
+    // --- Large icon ---
+    this._iconT = this.add.text(cx, cy - 95, '', { ...TEXT_STYLES.heading, fontSize: '56px', color: COLORS.goldCSS })
+      .setOrigin(0.5);
+
+    // --- Title ---
+    this._titleT = this.add.text(cx, cy - 28, '', TEXT_STYLES.heading)
+      .setOrigin(0.5);
+
+    // --- Gold divider ---
+    this._divGfx = this.add.graphics();
+
+    // --- Body text ---
+    this._bodyT = this.add.text(cx, cy + 20, '',
+      { ...TEXT_STYLES.body, wordWrap: { width: 580 }, align: 'center' })
+      .setOrigin(0.5, 0);
+
+    // --- Tip text ---
+    this._tipT = this.add.text(cx, cy + 100, '',
+      { ...TEXT_STYLES.caption, fontSize: '12px' })
+      .setOrigin(0.5);
+
+    // --- Progress dots ---
     this._dotsGfx = this.add.graphics();
 
-    const backBtn = this.add.text(40, cy, '←', {
-      fontSize: '28px', color: '#d4af37', fontFamily: 'sans-serif'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    backBtn.on('pointerdown', () => this._goTo(this._page - 1));
-    this._backBtn = backBtn;
+    // --- Back button (left) ---
+    this._backBtn = this.add.text(36, cy, '←',
+      { ...TEXT_STYLES.heading, fontSize: '28px' })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+    this._backBtn.on('pointerdown', () => this._goTo(this._page - 1));
 
-    const nextBtn = this.add.text(W - 40, cy, '→', {
-      fontSize: '28px', color: '#d4af37', fontFamily: 'sans-serif'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    nextBtn.on('pointerdown', () => this._advance());
-    this._nextBtn = nextBtn;
+    // --- Next / Start button (right) ---
+    this._nextBtnGfx = this.add.graphics();
+    this._nextBtnLabel = this.add.text(W - 36, cy, '→',
+      { ...TEXT_STYLES.heading, fontSize: '28px' })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+    this._nextBtnLabel.on('pointerdown', () => this._advance());
 
+    // --- Tap zone (center) ---
     const tapZone = this.add.rectangle(cx, cy, W - 120, H - 80, 0x000000, 0)
       .setInteractive();
     tapZone.on('pointerdown', () => this._advance());
@@ -54,43 +74,66 @@ export default class TutorialScene extends Phaser.Scene {
   _renderPage() {
     const W = this.scale.width, H = this.scale.height;
     const cx = W / 2, cy = H / 2;
-    const card = this._cards[this._page];
-    const cardW = 500, cardH = 260;
+    const card = TUTORIAL[this._page];
+    const cardW = 560, cardH = 300;
 
+    // Card background
     this._cardGfx.clear();
-    this._cardGfx.fillStyle(0x12003a, 0.95);
-    this._cardGfx.fillRoundedRect(cx - cardW / 2, cy - cardH / 2, cardW, cardH, 14);
-    this._cardGfx.lineStyle(2, 0x6633aa);
-    this._cardGfx.strokeRoundedRect(cx - cardW / 2, cy - cardH / 2, cardW, cardH, 14);
+    drawPanel(this._cardGfx, cx - cardW / 2, cy - cardH / 2, cardW, cardH, { radius: 14 });
 
+    // Progress
+    this._progressT.setText(`${this._page + 1} / ${TUTORIAL.length}`);
+
+    // Icon
     this._iconT.setText(card.icon);
-    this._titleT.setText(card.title);
-    this._bodyT.setText(card.body);
 
+    // Title
+    this._titleT.setText(card.title);
+
+    // Divider
+    this._divGfx.clear();
+    this._divGfx.lineStyle(1, COLORS.gold, 0.4);
+    this._divGfx.lineBetween(cx - 100, cy - 4, cx + 100, cy - 4);
+
+    // Body
+    this._bodyT.setText(card.body);
+    this._bodyT.setY(cy + 12);
+
+    // Tip
+    this._tipT.setText(card.tip);
+    this._tipT.setY(cy + 95);
+
+    // Progress dots
     this._dotsGfx.clear();
     const dotSpacing = 20;
-    const dotsStartX = cx - ((this._cards.length - 1) * dotSpacing) / 2;
-    this._cards.forEach((_, i) => {
+    const dotsStartX = cx - ((TUTORIAL.length - 1) * dotSpacing) / 2;
+    TUTORIAL.forEach((_, i) => {
       if (i === this._page) {
-        this._dotsGfx.fillStyle(0xd4af37);
+        this._dotsGfx.fillStyle(COLORS.gold, 1);
         this._dotsGfx.fillCircle(dotsStartX + i * dotSpacing, H - 24, 5);
       } else {
-        this._dotsGfx.fillStyle(0x443355);
-        this._dotsGfx.fillCircle(dotsStartX + i * dotSpacing, H - 24, 4);
+        this._dotsGfx.lineStyle(1.5, COLORS.purple, 0.8);
+        this._dotsGfx.strokeCircle(dotsStartX + i * dotSpacing, H - 24, 5);
       }
     });
 
+    // Back button visibility
     this._backBtn.setVisible(this._page > 0);
 
-    if (this._page === this._cards.length - 1) {
-      this._nextBtn.setText('▶');
+    // Next / Start button
+    if (this._page === TUTORIAL.length - 1) {
+      this._nextBtnLabel.setText('STARTE ABENTEUER')
+        .setFontSize('15px')
+        .setX(W - 90);
     } else {
-      this._nextBtn.setText('→');
+      this._nextBtnLabel.setText('→')
+        .setFontSize('28px')
+        .setX(W - 36);
     }
   }
 
   _advance() {
-    if (this._page < this._cards.length - 1) {
+    if (this._page < TUTORIAL.length - 1) {
       this._goTo(this._page + 1);
     } else {
       this.scene.start('DungeonScene');
@@ -98,7 +141,7 @@ export default class TutorialScene extends Phaser.Scene {
   }
 
   _goTo(idx) {
-    if (idx < 0 || idx >= this._cards.length) return;
+    if (idx < 0 || idx >= TUTORIAL.length) return;
     this._page = idx;
     this._renderPage();
   }

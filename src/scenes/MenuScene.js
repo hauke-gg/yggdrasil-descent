@@ -1,3 +1,6 @@
+import { COLORS, TEXT_STYLES, drawGrid, drawButton } from '../data/design-system.js';
+import { MENU } from '../data/copy.js';
+
 export default class MenuScene extends Phaser.Scene {
   constructor() { super('MenuScene'); }
 
@@ -5,112 +8,110 @@ export default class MenuScene extends Phaser.Scene {
     const W = this.scale.width, H = this.scale.height;
     const cx = W / 2, cy = H / 2;
 
+    // --- Background ---
     const bg = this.add.graphics();
-    bg.fillStyle(0x08010f);
+    bg.fillStyle(COLORS.void, 1);
     bg.fillRect(0, 0, W, H);
-    bg.lineStyle(1, 0x330066, 0.15);
-    for (let x = 0; x <= W; x += 48) bg.lineBetween(x, 0, x, H);
-    for (let y = 0; y <= H; y += 48) bg.lineBetween(0, y, W, y);
 
+    // Grid layer
+    const gridGfx = this.add.graphics();
+    drawGrid(gridGfx, W, H);
+
+    // Optional Higgsfield background
     if (this.textures.exists('menu_bg')) {
-      this.add.image(480, 270, 'menu_bg').setDisplaySize(960, 540).setDepth(-1);
+      this.add.image(480, 270, 'menu_bg')
+        .setDisplaySize(960, 540)
+        .setDepth(-1)
+        .setAlpha(0.55);
     }
 
-    const deco = this.add.graphics();
-    deco.lineStyle(1, 0x6633aa, 0.2);
-    deco.strokeCircle(cx, cy, 200);
-    deco.lineStyle(1, 0x6633aa, 0.12);
-    deco.strokeCircle(cx, cy, 245);
-    deco.lineStyle(2, 0x9944ee, 0.15);
-    deco.strokeCircle(cx, cy, 160);
-    deco.lineStyle(1, 0x441188, 0.3);
-    deco.lineBetween(cx, cy - 185, cx, cy + 185);
-    deco.lineBetween(cx - 185, cy, cx + 185, cy);
+    // --- Rune deco circles (behind title) ---
+    const decoGfx = this.add.graphics();
+    decoGfx.lineStyle(1, COLORS.purpleDim, 0.3);
+    decoGfx.strokeCircle(cx, 165, 120);
+    decoGfx.lineStyle(1, COLORS.purpleDim, 0.15);
+    decoGfx.strokeCircle(cx, 165, 160);
+    decoGfx.lineStyle(1, COLORS.goldDim, 0.12);
+    decoGfx.strokeCircle(cx, 165, 90);
 
-    this.tweens.add({
-      targets: deco,
-      alpha: { from: 0.6, to: 1 },
-      duration: 2200,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut'
-    });
+    // --- Floating particles ---
+    this._particles = [];
+    for (let i = 0; i < 15; i++) {
+      const x = Phaser.Math.Between(20, W - 20);
+      const y = Phaser.Math.Between(60, H - 40);
+      const color = Math.random() > 0.5 ? COLORS.gold : COLORS.purple;
+      const dot = this.add.graphics();
+      dot.fillStyle(color, 0.6 + Math.random() * 0.4);
+      dot.fillCircle(0, 0, 1.5 + Math.random() * 1.5);
+      dot.setPosition(x, y);
+      this._particles.push(dot);
 
-    const particles = [];
-    for (let i = 0; i < 12; i++) {
-      const px = Phaser.Math.Between(60, W - 60);
-      const py = Phaser.Math.Between(60, H - 60);
-      const color = Math.random() > 0.5 ? 0xd4af37 : 0x9944ee;
-      const dot = this.add.circle(px, py, Phaser.Math.Between(2, 4), color, Phaser.Math.FloatBetween(0.3, 0.6));
-      particles.push(dot);
       this.tweens.add({
         targets: dot,
-        y: dot.y - Phaser.Math.Between(30, 80),
+        y: y - Phaser.Math.Between(60, 140),
         alpha: 0,
-        duration: Phaser.Math.Between(3000, 5500),
+        duration: 2000 + Math.random() * 3000,
+        delay: Math.random() * 2000,
         ease: 'Sine.easeIn',
-        delay: Phaser.Math.Between(0, 2000),
-        onComplete: () => {
-          dot.y = Phaser.Math.Between(H - 60, H - 20);
-          dot.alpha = Phaser.Math.FloatBetween(0.3, 0.6);
-          this.tweens.add({
-            targets: dot,
-            y: dot.y - Phaser.Math.Between(30, 80),
-            alpha: 0,
-            duration: Phaser.Math.Between(3000, 5500),
-            ease: 'Sine.easeIn',
-            repeat: -1,
-            repeatDelay: Phaser.Math.Between(0, 2000)
-          });
+        repeat: -1,
+        onRepeat: () => {
+          dot.setPosition(Phaser.Math.Between(20, W - 20), H - 20);
+          dot.setAlpha(0.6 + Math.random() * 0.4);
         }
       });
     }
 
-    this.add.text(cx, cy - 96, 'YGGDRASIL', {
-      fontSize: '64px', color: '#d4af37', fontStyle: 'bold', fontFamily: 'serif',
-      stroke: '#441100', strokeThickness: 4,
-      shadow: { offsetX: 0, offsetY: 0, color: '#ff8800', blur: 30, fill: true }
-    }).setOrigin(0.5);
+    // --- Title ---
+    this.add.text(cx, 165, MENU.title, TEXT_STYLES.title)
+      .setOrigin(0.5);
 
-    this.add.text(cx, cy - 36, 'D E S C E N T', {
-      fontSize: '24px', color: '#cc9922', fontStyle: 'bold', fontFamily: 'serif',
-      letterSpacing: 14
-    }).setOrigin(0.5);
+    // --- Subtitle ---
+    this.add.text(cx, 235, MENU.subtitle, TEXT_STYLES.subtitle)
+      .setOrigin(0.5);
 
-    const line = this.add.graphics();
-    line.lineStyle(1, 0xd4af37, 0.5);
-    line.lineBetween(cx - 170, cy - 14, cx + 170, cy - 14);
+    // --- Gold divider ---
+    const divGfx = this.add.graphics();
+    divGfx.lineStyle(1, COLORS.gold, 0.5);
+    divGfx.lineBetween(cx - 120, 256, cx + 120, 256);
 
-    this.add.text(cx, cy + 8, 'Ein nordisches Roguelite', {
-      fontSize: '13px', color: '#775533', fontFamily: 'serif'
-    }).setOrigin(0.5);
+    // --- Tagline ---
+    this.add.text(cx, 275, MENU.tagline, TEXT_STYLES.caption)
+      .setOrigin(0.5);
 
-    const btnCx = cx, btnCy = cy + 68;
-    const btnW = 260, btnH = 52;
+    // --- Start button ---
+    const btnW = 260, btnH = 58;
+    const btnX = cx - btnW / 2;
+    const btnY = 330;
+
     const btnGfx = this.add.graphics();
-    const drawBtn = (hover) => {
+    drawButton(btnGfx, btnX, btnY, btnW, btnH, false);
+
+    const btnLabel = this.add.text(cx, btnY + btnH / 2, MENU.startButton, TEXT_STYLES.button)
+      .setOrigin(0.5);
+
+    const btnHit = this.add.rectangle(cx, btnY + btnH / 2, btnW, btnH, 0x000000, 0)
+      .setInteractive({ useHandCursor: true });
+
+    btnHit.on('pointerover', () => {
       btnGfx.clear();
-      btnGfx.fillStyle(hover ? 0x5a0099 : 0x2a0050, hover ? 1 : 0.95);
-      btnGfx.fillRoundedRect(btnCx - btnW / 2, btnCy - btnH / 2, btnW, btnH, 8);
-      btnGfx.lineStyle(2, 0xd4af37);
-      btnGfx.strokeRoundedRect(btnCx - btnW / 2, btnCy - btnH / 2, btnW, btnH, 8);
-    };
-    drawBtn(false);
+      drawButton(btnGfx, btnX, btnY, btnW, btnH, true);
+      btnLabel.setStyle({ ...TEXT_STYLES.button, color: COLORS.goldCSS });
+    });
+    btnHit.on('pointerout', () => {
+      btnGfx.clear();
+      drawButton(btnGfx, btnX, btnY, btnW, btnH, false);
+      btnLabel.setStyle({ ...TEXT_STYLES.button, color: '#ffffff' });
+    });
+    btnHit.on('pointerdown', () => {
+      this.scene.start('CharacterScene');
+    });
 
-    const btnT = this.add.text(btnCx, btnCy, '▶  ABENTEUER BEGINNEN', {
-      fontSize: '17px', color: '#d4af37', fontStyle: 'bold', fontFamily: 'sans-serif'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true, hitArea: new Phaser.Geom.Rectangle(btnCx - btnW / 2, btnCy - btnH / 2, btnW, btnH), hitAreaCallback: Phaser.Geom.Rectangle.Contains });
+    // --- Version bottom-left ---
+    this.add.text(12, H - 16, MENU.version, TEXT_STYLES.tiny)
+      .setOrigin(0, 1);
 
-    btnT.on('pointerover', () => { drawBtn(true); btnT.setStyle({ color: '#ffffff' }); });
-    btnT.on('pointerout', () => { drawBtn(false); btnT.setStyle({ color: '#d4af37' }); });
-    btnT.on('pointerdown', () => this.scene.start('CharacterScene'));
-
-    this.add.text(20, H - 14, 'v0.1.0 Alpha', {
-      fontSize: '10px', color: '#332244', fontFamily: 'monospace'
-    }).setOrigin(0, 1);
-
-    this.add.text(W - 20, H - 14, 'hauke-gg.github.io', {
-      fontSize: '10px', color: '#332244', fontFamily: 'monospace'
-    }).setOrigin(1, 1);
+    // --- URL bottom-right ---
+    this.add.text(W - 12, H - 16, 'hauke-gg.github.io/yggdrasil-descent', TEXT_STYLES.tiny)
+      .setOrigin(1, 1);
   }
 }
