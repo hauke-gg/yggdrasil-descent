@@ -29,6 +29,14 @@ export default class HUD {
       fontSize: '14px', color: '#ffaaaa', fontFamily: 'monospace'
     }).setOrigin(1, 0.5).setDepth(53).setScrollFactor(0);
 
+    this._biomeText = scene.add.text(948, 30, 'Midgard', {
+      fontSize: '10px', color: '#88cc88', fontFamily: 'monospace'
+    }).setOrigin(1, 0.5).setDepth(53).setScrollFactor(0);
+
+    this._timerText = scene.add.text(480, 12, '00:00', {
+      fontSize: '16px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold'
+    }).setOrigin(0.5, 0).setDepth(53).setScrollFactor(0);
+
     this._drawStatic();
   }
 
@@ -47,10 +55,10 @@ export default class HUD {
 
     this._killBg.clear();
     this._killBg.fillStyle(0x000000, 0.6);
-    this._killBg.fillRoundedRect(880, 6, 76, 22, 4);
+    this._killBg.fillRoundedRect(880, 6, 76, 38, 4);
   }
 
-  update(player) {
+  update(player, survivalSeconds, biomeName) {
     const hpRatio = Math.max(0, player.hp / player.maxHp);
     const xpRatio = Math.min(1, player.xp / player.xpToNext);
 
@@ -66,13 +74,23 @@ export default class HUD {
     this._hpText.setText(`${player.hp}/${player.maxHp}`);
     this._levelBadge.setText(`Lv.${player.level}`);
     this._killText.setText(`☠ ${player.kills}`);
+
+    if (survivalSeconds !== undefined) {
+      const mins = Math.floor(survivalSeconds / 60).toString().padStart(2, '0');
+      const secs = (survivalSeconds % 60).toString().padStart(2, '0');
+      this._timerText.setText(`${mins}:${secs}`);
+    }
+
+    if (biomeName !== undefined) {
+      this._biomeText.setText(biomeName);
+    }
   }
 
   destroy() {
     [
       this._hpLabel, this._xpLabel, this._hpBg, this._hpFill,
       this._xpBg, this._xpFill, this._hpText, this._levelBadge,
-      this._killBg, this._killText
+      this._killBg, this._killText, this._timerText, this._biomeText
     ].forEach(o => o && o.destroy());
   }
 }
