@@ -1,6 +1,10 @@
 export default class BootScene extends Phaser.Scene {
   constructor() { super('BootScene'); }
 
+  preload() {
+    this.load.image('menu_bg', 'assets/menu-bg.png');
+  }
+
   create() {
     this._makePlayer();
     this._makeDraugr();
