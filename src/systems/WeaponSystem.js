@@ -1,5 +1,4 @@
 import { getScaledWeapon, PASSIVES } from '../data/weapons.js';
-import { checkEvolution } from '../data/evolutions.js';
 
 export default class WeaponSystem {
   constructor(scene, player, enemyGroup) {
@@ -14,14 +13,6 @@ export default class WeaponSystem {
   update(time) {
     for (const weaponSlot of this.player.weapons) {
       const weaponId = weaponSlot.id;
-
-      // Evolution prüfen und Slot ersetzen
-      const evo = checkEvolution(weaponId, weaponSlot.level, this.player.passives);
-      if (evo && weaponId !== evo.id) {
-        weaponSlot.id = evo.id;
-        this.scene.events.emit('weaponEvolved', evo);
-        continue;
-      }
 
       const stats = this._getEffectiveStats(weaponId, weaponSlot.level);
       if (!stats) continue;

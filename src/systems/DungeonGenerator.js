@@ -30,7 +30,8 @@ export default class DungeonGenerator {
 
   // Zeichnet Floor-Layout in eine Phaser-Scene
   drawFloor(scene, floorData) {
-    const gfx = scene.add.graphics().setDepth(0);
+    const container = scene.add.container(0, 0).setDepth(0);
+    const gfx = scene.add.graphics();
 
     // Boden
     gfx.fillStyle(0x1a0a2e);
@@ -46,10 +47,11 @@ export default class DungeonGenerator {
     gfx.strokeRect(r.x, r.y, r.w, r.h);
 
     // Floor-Nummer anzeigen
-    scene.add.text(10, 10, `Floor ${floorData.floorNumber} — Midgard`, {
+    const txt = scene.add.text(10, 10, `Floor ${floorData.floorNumber} — Midgard`, {
       fontSize: '16px', color: '#aaaaaa', fontFamily: 'sans-serif'
     }).setDepth(20);
 
-    return gfx;
+    container.add([gfx, txt]);
+    return container;
   }
 }

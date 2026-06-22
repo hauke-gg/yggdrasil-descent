@@ -4,6 +4,7 @@ export default class GameOverScene extends Phaser.Scene {
   init(data) {
     this.floor = data.floor || 1;
     this.kills = data.kills || 0;
+    this.victory = data.victory || false;
   }
 
   create() {
@@ -12,9 +13,15 @@ export default class GameOverScene extends Phaser.Scene {
 
     this.add.rectangle(cx, cy, 960, 540, 0x000000, 0.8);
 
-    this.add.text(cx, cy - 80, 'GEFALLEN IN MIDGARD', {
-      fontSize: '36px', color: '#ff4444', fontStyle: 'bold', fontFamily: 'serif'
-    }).setOrigin(0.5);
+    if (this.victory) {
+      this.add.text(cx, cy - 80, 'VALHALLA RUFT!', {
+        fontSize: '36px', color: '#ffdd00', fontStyle: 'bold', fontFamily: 'serif'
+      }).setOrigin(0.5);
+    } else {
+      this.add.text(cx, cy - 80, 'GEFALLEN IN MIDGARD', {
+        fontSize: '36px', color: '#ff4444', fontStyle: 'bold', fontFamily: 'serif'
+      }).setOrigin(0.5);
+    }
 
     this.add.text(cx, cy - 20, `Floor erreicht: ${this.floor}`, {
       fontSize: '22px', color: '#ffffff', fontFamily: 'sans-serif'

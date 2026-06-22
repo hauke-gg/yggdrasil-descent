@@ -85,6 +85,8 @@ export default class DungeonScene extends Phaser.Scene {
     if (this._enemies.countActive() === 0 && !this._levelUpPending) {
       if (this._waveSystem.isBossFloor() && !this._bossSpawned) {
         this._spawnBoss();
+      } else if (this._waveSystem.isBossFloor() && this._bossSpawned) {
+        this._onBossDefeated();
       } else if (this._waveSystem.hasMoreWaves()) {
         this.time.delayedCall(1500, () => this._spawnNextWave());
       } else if (!this._waveSystem.isBossFloor()) {
@@ -224,8 +226,9 @@ export default class DungeonScene extends Phaser.Scene {
 
     // Kurze Unverwundbarkeit + Geschwindigkeitsboost in Bewegungsrichtung
     const vec = this._joystick.getVector();
-    const dx = vec.x !== 0 || vec.y !== 0 ? vec.x : 0;
-    const dy = vec.x !== 0 || vec.y !== 0 ? vec.y : -1;
+    const hasInput = vec.x !== 0 || vec.y !== 0;
+    const dx = hasInput ? vec.x : 0;
+    const dy = hasInput ? vec.y : -1;
 
     this._player._invincible = true;
     this._player.setVelocity(dx * 500, dy * 500);
@@ -254,6 +257,17 @@ export default class DungeonScene extends Phaser.Scene {
       alpha: 0,
       duration: 2500,
       onComplete: () => text.destroy()
+    });
+  }
+
+  _onBossDefeated() {
+    this._bossSpawned = false;
+    this.time.delayedCall(1500, () => {
+      this.scene.start('GameOverScene', {
+        floor: this._currentFloor,
+        kills: this._player.kills,
+        victory: true
+      });
     });
   }
 
