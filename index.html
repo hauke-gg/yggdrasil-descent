@@ -8,11 +8,67 @@
   <title>Yggdrasil Descent</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0a0015; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
-    canvas { display: block; max-width: 100vw; max-height: 100vh; }
+    html, body {
+      background: #0a0015;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    canvas {
+      display: block;
+      max-width: 100vw;
+      max-height: 100vh;
+      touch-action: none;
+    }
+
+    /* Drehen-Overlay für Portrait */
+    #rotate-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #0a0015;
+      z-index: 9999;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 24px;
+      color: #d4af37;
+      font-family: serif;
+      text-align: center;
+    }
+    #rotate-overlay .icon {
+      font-size: 64px;
+      animation: spin 2s ease-in-out infinite;
+    }
+    #rotate-overlay p {
+      font-size: 22px;
+      color: #aaaaaa;
+      max-width: 280px;
+      line-height: 1.5;
+    }
+    @keyframes spin {
+      0%, 100% { transform: rotate(0deg); }
+      40% { transform: rotate(90deg); }
+      60% { transform: rotate(90deg); }
+    }
+    @media (orientation: portrait) {
+      #rotate-overlay { display: flex; }
+    }
   </style>
 </head>
 <body>
+  <div id="rotate-overlay">
+    <div class="icon">📱</div>
+    <h2>Gerät drehen</h2>
+    <p>Yggdrasil Descent wird im Querformat gespielt</p>
+  </div>
+
   <script src="lib/phaser.min.js"></script>
   <script type="module" src="src/main.js"></script>
 </body>

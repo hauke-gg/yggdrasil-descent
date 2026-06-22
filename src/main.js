@@ -7,10 +7,13 @@ const config = {
   type: Phaser.AUTO,
   width: 960,
   height: 540,
-  backgroundColor: '#0a0015',
+  backgroundColor: '#06000f',
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
+  },
+  input: {
+    activePointers: 3
   },
   physics: {
     default: 'arcade',
