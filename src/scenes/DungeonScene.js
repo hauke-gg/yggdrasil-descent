@@ -16,6 +16,10 @@ export default class DungeonScene extends Phaser.Scene {
   constructor() { super('DungeonScene'); }
 
   create() {
+    const savedPlayer = JSON.parse(localStorage.getItem('ygg_player') || '{}');
+    this._playerName = savedPlayer.name || 'Krieger';
+    this._playerClass = savedPlayer.class || 'krieger';
+
     this._currentFloor = 1;
     this._kills = 0;
     this._levelUpPending = false;

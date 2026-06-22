@@ -3,56 +3,64 @@ import { WEAPONS, PASSIVES } from '../data/weapons.js';
 export default class LevelUpUI {
   constructor(scene) {
     this.scene = scene;
-    this._container = null;
+    this._objects = [];
   }
 
-  // options: Array von { type: 'weapon'|'passive'|'upgrade', id: string }
-  // onChoice: (option) => void
   show(options, onChoice) {
-    // Spiel pausieren
+    this.hide();
     this.scene.physics.pause();
 
     const cx = 480, cy = 270;
-    this._container = this.scene.add.container(0, 0).setDepth(100);
 
-    // Dunkles Overlay
-    const overlay = this.scene.add.rectangle(cx, cy, 960, 540, 0x000000, 0.75);
-    this._container.add(overlay);
+    const overlay = this.scene.add.rectangle(cx, cy, 960, 540, 0x000000, 0.78).setDepth(100);
+    this._objects.push(overlay);
 
-    this.scene.add.text(cx, cy - 160, '⚔  LEVEL UP  ⚔', {
+    const title = this.scene.add.text(cx, cy - 155, '⚔  LEVEL UP  ⚔', {
       fontSize: '28px', color: '#d4af37', fontStyle: 'bold', fontFamily: 'serif'
     }).setOrigin(0.5).setDepth(101);
+    this._objects.push(title);
 
-    const cardW = 220, cardH = 160;
-    const startX = cx - (options.length - 1) * (cardW / 2 + 10);
+    const cardW = 220, cardH = 165;
+    const gap = 20;
+    const totalW = options.length * cardW + (options.length - 1) * gap;
+    const startX = cx - totalW / 2 + cardW / 2;
 
     options.forEach((option, i) => {
-      const cardX = startX + i * (cardW + 20);
-      const cardY = cy;
+      const cardX = startX + i * (cardW + gap);
       const info = this._getOptionInfo(option);
 
-      // Karte
-      const card = this.scene.add.rectangle(cardX, cardY, cardW, cardH, 0x2d1b4e)
-        .setStrokeStyle(2, 0x8844cc).setInteractive({ useHandCursor: true }).setDepth(101);
+      const cardBg = this.scene.add.graphics().setDepth(101);
+      const drawCard = (hover) => {
+        cardBg.clear();
+        cardBg.fillStyle(hover ? 0x2a1060 : 0x1a0033, hover ? 0.98 : 0.92);
+        cardBg.fillRoundedRect(cardX - cardW / 2, cy - cardH / 2, cardW, cardH, 10);
+        cardBg.lineStyle(2, hover ? 0xd4af37 : 0x8844cc);
+        cardBg.strokeRoundedRect(cardX - cardW / 2, cy - cardH / 2, cardW, cardH, 10);
+      };
+      drawCard(false);
+      this._objects.push(cardBg);
 
-      this.scene.add.text(cardX, cardY - 50, info.icon, { fontSize: '32px' }).setOrigin(0.5).setDepth(102);
-      this.scene.add.text(cardX, cardY - 10, info.name, {
-        fontSize: '16px', color: '#ffffff', fontStyle: 'bold', fontFamily: 'sans-serif',
-        wordWrap: { width: cardW - 20 }
+      const iconT = this.scene.add.text(cardX, cy - 52, info.icon, { fontSize: '32px' }).setOrigin(0.5).setDepth(102);
+      const nameT = this.scene.add.text(cardX, cy - 8, info.name, {
+        fontSize: '15px', color: '#ffffff', fontStyle: 'bold', fontFamily: 'sans-serif',
+        wordWrap: { width: cardW - 20 }, align: 'center'
       }).setOrigin(0.5).setDepth(102);
-      this.scene.add.text(cardX, cardY + 30, info.description, {
+      const descT = this.scene.add.text(cardX, cy + 34, info.description, {
         fontSize: '12px', color: '#aaaaaa', fontFamily: 'sans-serif',
         wordWrap: { width: cardW - 20 }, align: 'center'
       }).setOrigin(0.5).setDepth(102);
+      this._objects.push(iconT, nameT, descT);
 
-      card.on('pointerover', () => card.setFillStyle(0x4a2a7e));
-      card.on('pointerout', () => card.setFillStyle(0x2d1b4e));
-      card.on('pointerdown', () => {
-        this._close();
+      const hit = this.scene.add.rectangle(cardX, cy, cardW, cardH, 0x000000, 0)
+        .setInteractive({ useHandCursor: true }).setDepth(102);
+      this._objects.push(hit);
+
+      hit.on('pointerover', () => drawCard(true));
+      hit.on('pointerout', () => drawCard(false));
+      hit.on('pointerdown', () => {
+        this.hide();
         onChoice(option);
       });
-
-      this._container.add([card]);
     });
   }
 
@@ -72,13 +80,9 @@ export default class LevelUpUI {
     return { icon: '?', name: option.id, description: '' };
   }
 
-  _close() {
-    if (this._container) {
-      this._container.destroy();
-      this._container = null;
-    }
-    // Alle Text-Objekte die außerhalb des Containers erzeugt wurden aufräumen
-    // (DungeonScene räumt via Scene-Restart auf)
-    this.scene.physics.resume();
+  hide() {
+    this._objects.forEach(o => { if (o && o.destroy) o.destroy(); });
+    this._objects = [];
+    if (this.scene && this.scene.physics) this.scene.physics.resume();
   }
 }
