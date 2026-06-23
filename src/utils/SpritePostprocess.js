@@ -9,7 +9,13 @@
  * Result is cached by target key so this only runs once per source.
  */
 
-export function makeBlackTransparent(scene, sourceKey, targetKey = null, threshold = 28) {
+/**
+ * Edge-based black background removal. Threshold is intentionally low so
+ * we don't eat into the dark parts of the figure itself (skin in shadow,
+ * black hair, deep folds). Instead we flood-fill from the canvas edges
+ * inward — only "outside" black pixels become transparent.
+ */
+export function makeBlackTransparent(scene, sourceKey, targetKey = null, threshold = 38) {
   const finalKey = targetKey || (sourceKey + '_clean');
   if (scene.textures.exists(finalKey)) return finalKey;
   const sourceTex = scene.textures.get(sourceKey);
@@ -24,18 +30,53 @@ export function makeBlackTransparent(scene, sourceKey, targetKey = null, thresho
 
   const imageData = ctx.getImageData(0, 0, w, h);
   const data = imageData.data;
-  // Two-pass with soft edge: pure-black → alpha 0, near-black → faded alpha
-  const softLimit = threshold + 14;
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i], g = data[i + 1], b = data[i + 2];
-    const maxC = Math.max(r, g, b);
-    if (maxC < threshold) {
+  const softLimit = threshold + 18;
+  const isBlackish = (i) => Math.max(data[i], data[i + 1], data[i + 2]) < threshold;
+  const isSoftBlack = (i) => Math.max(data[i], data[i + 1], data[i + 2]) < softLimit;
+
+  // BFS flood-fill from all edge pixels — only mark "outside" black regions
+  // (the painted figure's shadows stay opaque).
+  const visited = new Uint8Array(w * h);
+  const queue = [];
+
+  const push = (px, py) => {
+    if (px < 0 || py < 0 || px >= w || py >= h) return;
+    const flat = py * w + px;
+    if (visited[flat]) return;
+    const i = flat * 4;
+    if (!isSoftBlack(i)) return;
+    visited[flat] = 1;
+    queue.push(flat);
+  };
+
+  for (let px = 0; px < w; px++) {
+    push(px, 0);
+    push(px, h - 1);
+  }
+  for (let py = 0; py < h; py++) {
+    push(0, py);
+    push(w - 1, py);
+  }
+
+  while (queue.length) {
+    const flat = queue.pop();
+    const px = flat % w;
+    const py = (flat - px) / w;
+    const i = flat * 4;
+    // Hard cut for solid black, soft fade for near-black at the silhouette edge
+    if (isBlackish(i)) {
       data[i + 3] = 0;
-    } else if (maxC < softLimit) {
+    } else {
+      const maxC = Math.max(data[i], data[i + 1], data[i + 2]);
       const fade = (maxC - threshold) / (softLimit - threshold);
       data[i + 3] = Math.round(255 * fade);
     }
+    push(px - 1, py);
+    push(px + 1, py);
+    push(px, py - 1);
+    push(px, py + 1);
   }
+
   ctx.putImageData(imageData, 0, 0);
   canvasTex.refresh();
   return finalKey;

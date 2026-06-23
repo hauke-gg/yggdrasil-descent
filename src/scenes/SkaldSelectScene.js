@@ -89,37 +89,51 @@ export default class SkaldSelectScene extends Phaser.Scene {
         .strokeRoundedRect(rx + 16, ry + 16, w - 32, w - 32, 6);
     }
 
+    // Anchors derived from card dimensions so it scales cleanly
+    const portraitBottom = ry + 16 + (w - 32); // square portrait
+    const nameY = portraitBottom + 14;
+    const epithetY = nameY + 20;
+    const dividerY = epithetY + 16;
+    const traumaY = dividerY + 10;
+    // Reserve a clear band for stats at the bottom
+    const statsLineH = 26;
+    const statsY = ry + h - 14;
+    const statsTop = statsY - statsLineH;
+
     // Name
-    const name = this.add.text(cx, ry + 264, skald.name, {
-      fontFamily: "'Cinzel', serif", fontSize: '18px',
+    const name = this.add.text(cx, nameY, skald.name, {
+      fontFamily: "'Cinzel', serif", fontSize: '16px',
       color: '#FFD66B', fontStyle: 'bold',
       stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(5);
 
     // Epithet
-    const epithet = this.add.text(cx, ry + 286, skald.epithet, {
-      fontFamily: "'Lora', serif", fontSize: '12px', fontStyle: 'italic',
+    const epithet = this.add.text(cx, epithetY, skald.epithet, {
+      fontFamily: "'Lora', serif", fontSize: '11px', fontStyle: 'italic',
       color: '#a89888',
     }).setOrigin(0.5).setDepth(5);
 
     // Divider
     const div = this.add.graphics().setDepth(5);
     div.lineStyle(1, 0xC9A961, 0.4)
-      .lineBetween(rx + 30, ry + 308, rx + w - 30, ry + 308);
+      .lineBetween(rx + 30, dividerY, rx + w - 30, dividerY);
 
-    // Trauma
-    const trauma = this.add.text(cx, ry + 320, skald.trauma, {
-      fontFamily: "'Lora', serif", fontSize: '11px',
+    // Trauma — limit to 4 lines, ellipsis if longer
+    const trauma = this.add.text(cx, traumaY, skald.trauma, {
+      fontFamily: "'Lora', serif", fontSize: '10.5px',
       color: '#cdb8a8', align: 'center',
       wordWrap: { width: w - 30 }, lineSpacing: 3,
+      maxLines: 4,
     }).setOrigin(0.5, 0).setDepth(5);
 
-    // Stats line
-    const stats = this.add.text(cx, ry + h - 28, skald.statLabel, {
+    // Stats line — measure trauma's actual height and anchor stats safely below
+    const traumaBottom = traumaY + trauma.height;
+    const minStatsY = Math.max(statsY, traumaBottom + 14);
+    const stats = this.add.text(cx, minStatsY, skald.statLabel, {
       fontFamily: "'Space Mono', monospace", fontSize: '10px',
       color: CSS_COLORS.purpleLight, letterSpacing: 1, align: 'center',
-      wordWrap: { width: w - 20 },
-    }).setOrigin(0.5, 1).setDepth(5);
+      wordWrap: { width: w - 20 }, lineSpacing: 2,
+    }).setOrigin(0.5, 0).setDepth(5);
 
     // Interactive overlay
     const hit = this.add.rectangle(cx, cy, w, h, 0x000000, 0)

@@ -204,31 +204,74 @@ export default class Skaldenlied {
   }
 
   _spawnBurst(x, y, damage) {
+    // Wind-burst: 12 amber-gold projectiles in a flat star + brief wind ring
     const scene = this.scene;
-    for (let i = 0; i < 8; i++) {
-      const angle = (i / 8) * Math.PI * 2;
-      this._spawnProjectile(x, y, angle, damage, 0xffcc66, 380, 700);
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      this._spawnProjectile(x, y, angle, damage, 0xffcc66, 420, 750);
     }
+    // Outward gust ring (yellow)
+    const ring = scene.add.circle(x, y, 14, 0xffcc66, 0)
+      .setStrokeStyle(3, 0xFFE5B0, 0.85).setDepth(38);
+    scene.tweens.add({
+      targets: ring, radius: 90, alpha: 0, duration: 320, ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
+    });
   }
 
   _spawnStrike(x, y, damage) {
+    // Spear-strike: fast cyan-white lance + crack-line streaks behind it
     const scene = this.scene;
     const target = this._nearestEnemy(x, y);
     if (!target) return;
     const angle = Math.atan2(target.y - y, target.x - x);
-    this._spawnProjectile(x, y, angle, damage, 0xcceeff, 700, 500);
+    this._spawnProjectile(x, y, angle, damage, 0xcceeff, 850, 500);
+    // Crack streak trail
+    for (let i = 0; i < 5; i++) {
+      const offsetAngle = angle + (Math.random() - 0.5) * 0.3;
+      const dist = 30 + Math.random() * 60;
+      const streak = scene.add.rectangle(
+        x + Math.cos(offsetAngle) * dist,
+        y + Math.sin(offsetAngle) * dist,
+        14, 2, 0xddeeff, 0.85,
+      ).setDepth(39).setRotation(angle);
+      scene.tweens.add({
+        targets: streak, alpha: 0, scaleX: 0,
+        duration: 220, ease: 'Cubic.easeOut',
+        onComplete: () => streak.destroy(),
+      });
+    }
   }
 
   _spawnNova(x, y, radius, damage) {
+    // Void-nova: violet ring + dark shockwave + inner purple sparks
     const scene = this.scene;
-    const ring = scene.add.circle(x, y, 10, 0x9966ff, 0.4).setDepth(40);
+    const outerRing = scene.add.circle(x, y, 14, 0x9966ff, 0)
+      .setStrokeStyle(4, 0xBB88FF, 1).setDepth(40);
     scene.tweens.add({
-      targets: ring,
-      radius: radius,
-      alpha: 0,
-      duration: 350,
-      onComplete: () => ring.destroy(),
+      targets: outerRing, radius, alpha: 0,
+      duration: 420, ease: 'Cubic.easeOut',
+      onComplete: () => outerRing.destroy(),
     });
+    const innerRing = scene.add.circle(x, y, 8, 0x4a1088, 0.55).setDepth(39);
+    scene.tweens.add({
+      targets: innerRing, radius: radius * 0.7, alpha: 0,
+      duration: 320, ease: 'Cubic.easeIn',
+      onComplete: () => innerRing.destroy(),
+    });
+    // Violet sparks
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const spark = scene.add.circle(x, y, 2, 0xCC88FF, 1).setDepth(41);
+      scene.tweens.add({
+        targets: spark,
+        x: x + Math.cos(a) * radius * 0.9,
+        y: y + Math.sin(a) * radius * 0.9,
+        alpha: 0,
+        duration: 360 + Math.random() * 120, ease: 'Cubic.easeOut',
+        onComplete: () => spark.destroy(),
+      });
+    }
     if (scene.enemies) {
       scene.enemies.children.iterate((e) => {
         if (!e || !e.active) return;
@@ -241,16 +284,38 @@ export default class Skaldenlied {
   }
 
   _applyFreeze(x, y, radius, slow, dur) {
+    // Frost-aura: thick ice-blue dome with crystal points + slow lingering haze
     const scene = this.scene;
-    const ring = scene.add.circle(x, y, radius, 0x66aaff, 0.25).setDepth(40);
-    scene.tweens.add({ targets: ring, alpha: 0, duration: 600, onComplete: () => ring.destroy() });
+    const dome = scene.add.circle(x, y, radius, 0x66aaff, 0.18).setDepth(38);
+    const rim = scene.add.circle(x, y, radius, 0xAADDFF, 0)
+      .setStrokeStyle(2.5, 0xCCEEFF, 0.9).setDepth(40);
+    scene.tweens.add({ targets: dome, alpha: 0, duration: 1200,
+      onComplete: () => dome.destroy() });
+    scene.tweens.add({ targets: rim, scale: 1.05, alpha: 0, duration: 700,
+      ease: 'Cubic.easeOut', onComplete: () => rim.destroy() });
+    // Ice crystal spikes around the rim
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const cx = x + Math.cos(a) * radius * 0.9;
+      const cy = y + Math.sin(a) * radius * 0.9;
+      const crystal = scene.add.triangle(cx, cy, 0, 0, 6, -14, 12, 0, 0xDDEEFF, 0.85)
+        .setRotation(a + Math.PI / 2).setDepth(41);
+      scene.tweens.add({
+        targets: crystal, alpha: 0, scale: 0.5,
+        duration: 700, delay: 50 + i * 18,
+        onComplete: () => crystal.destroy(),
+      });
+    }
     if (scene.enemies) {
       scene.enemies.children.iterate((e) => {
         if (!e || !e.active) return;
         const dx = e.x - x, dy = e.y - y;
         if (dx * dx + dy * dy <= radius * radius) {
           e.speedMult = slow;
-          scene.time.delayedCall(dur, () => { if (e && e.active) e.speedMult = 1; });
+          e.setTint(0x88BBFF);
+          scene.time.delayedCall(dur, () => {
+            if (e && e.active) { e.speedMult = 1; e.clearTint(); }
+          });
         }
       });
     }

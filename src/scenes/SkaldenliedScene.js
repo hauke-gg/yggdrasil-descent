@@ -30,11 +30,11 @@ import {
 } from '../utils/SkaldenliedArt.js';
 import { audio } from '../audio/AudioBus.js';
 
-const ROOM_W = 4000;
-const ROOM_H = 4000;
+const ROOM_W = 3200;
+const ROOM_H = 3200;
 const CENTER_X = ROOM_W / 2;
 const CENTER_Y = ROOM_H / 2;
-const HIGGSFIELD_SIZE = 1800; // Higgsfield bg covers the central spawn area
+const HIGGSFIELD_SIZE = 2400; // central painted region — most of the playable map
 
 export default class SkaldenliedScene extends Phaser.Scene {
   constructor() { super('SkaldenliedScene'); }
@@ -116,31 +116,58 @@ export default class SkaldenliedScene extends Phaser.Scene {
   }
 
   _drawRoom() {
-    // Single big floor fill — one rect, no per-tile draws
+    // Base floor — darker outer ring + mauve-tinted core
     const floor = this.add.graphics().setDepth(-2);
     floor.fillStyle(0x0A0612, 1).fillRect(0, 0, ROOM_W, ROOM_H);
 
-    // Sparse rune carvings (single graphics pass)
-    floor.lineStyle(1, 0xC9A961, 0.20);
-    const RUNE_COUNT = 36;
+    // Outer band gets a deeper helheim tint so the edge of the world doesn't read as "empty"
+    const bandSteps = 14;
+    for (let i = 0; i < bandSteps; i++) {
+      const t = i / bandSteps;
+      const inset = t * 220;
+      const alpha = 0.05 * (1 - t);
+      floor.fillStyle(0x2A1C36, alpha)
+        .fillRect(inset, inset, ROOM_W - inset * 2, ROOM_H - inset * 2);
+    }
+
+    // Tile-able floor texture — large rune-stones grid evenly across the outer area
+    const TILE = 320;
+    floor.lineStyle(1, 0x3a2040, 0.55);
+    for (let tx = 0; tx <= ROOM_W; tx += TILE) {
+      floor.beginPath().moveTo(tx, 0).lineTo(tx, ROOM_H).strokePath();
+    }
+    for (let ty = 0; ty <= ROOM_H; ty += TILE) {
+      floor.beginPath().moveTo(0, ty).lineTo(ROOM_W, ty).strokePath();
+    }
+
+    // Rune carvings only outside the painted Higgsfield area
+    floor.lineStyle(1.5, 0xC9A961, 0.28);
+    const RUNE_COUNT = 56;
     for (let i = 0; i < RUNE_COUNT; i++) {
       const rx = Math.random() * ROOM_W;
       const ry = Math.random() * ROOM_H;
-      // Skip near center (Higgsfield area covers it)
       const dx = rx - CENTER_X, dy = ry - CENTER_Y;
-      if (dx * dx + dy * dy < HIGGSFIELD_SIZE * HIGGSFIELD_SIZE / 4) continue;
+      if (dx * dx + dy * dy < (HIGGSFIELD_SIZE / 2.2) * (HIGGSFIELD_SIZE / 2.2)) continue;
+      const variant = Math.floor(Math.random() * 3);
       floor.beginPath();
-      floor.moveTo(rx - 8, ry - 8);
-      floor.lineTo(rx + 8, ry + 8);
-      floor.moveTo(rx + 8, ry - 8);
-      floor.lineTo(rx - 8, ry + 8);
+      if (variant === 0) {
+        floor.moveTo(rx - 10, ry - 10).lineTo(rx + 10, ry + 10)
+             .moveTo(rx + 10, ry - 10).lineTo(rx - 10, ry + 10);
+      } else if (variant === 1) {
+        floor.moveTo(rx, ry - 12).lineTo(rx, ry + 12)
+             .moveTo(rx - 8, ry).lineTo(rx + 8, ry);
+      } else {
+        floor.moveTo(rx - 12, ry).lineTo(rx, ry - 10).lineTo(rx + 12, ry)
+             .lineTo(rx, ry + 10).closePath();
+      }
       floor.strokePath();
     }
 
-    // Higgsfield Wurzelkammer ONLY at the center — as the sacred spawn area
+    // Higgsfield Wurzelkammer at center — now bigger so the painted area
+    // covers most of the visible play space
     if (this.textures.exists('wurzelkammer_bg')) {
       this.add.image(CENTER_X, CENTER_Y, 'wurzelkammer_bg')
-        .setDisplaySize(HIGGSFIELD_SIZE, HIGGSFIELD_SIZE * 9 / 16)
+        .setDisplaySize(HIGGSFIELD_SIZE, HIGGSFIELD_SIZE)
         .setDepth(-1);
     }
 
@@ -214,11 +241,20 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this._playerBaseScale = this.player.scaleX;
     this._playerFacing = 1; // 1 = right, -1 = left
 
-    // Idle breath: subtle scaleY pulse
+    // Idle breath: visible scaleY pulse
     this.tweens.add({
       targets: this.player,
-      scaleY: this.player.scaleY * 1.035,
-      duration: 1400,
+      scaleY: this.player.scaleY * 1.08,
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    // Subtle bob
+    this.tweens.add({
+      targets: this.player,
+      y: this.player.y - 3,
+      duration: 1200,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
@@ -407,11 +443,14 @@ export default class SkaldenliedScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(83).setScrollFactor(0);
     }
 
-    // Sub label below
-    const sub = this.add.text(cx, cy + r + 8, opts.subLabel, {
-      fontFamily: "'Space Mono', monospace", fontSize: '9px',
-      color: dimCss, letterSpacing: 1,
-    }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
+    // Sub label below — desktop only; on mobile the 2×2 grid would overlap
+    let sub = null;
+    if (!isMobile(this)) {
+      sub = this.add.text(cx, cy + r + 8, opts.subLabel, {
+        fontFamily: "'Space Mono', monospace", fontSize: '9px',
+        color: dimCss, letterSpacing: 1,
+      }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
+    }
 
     // Tap zone — only on mobile, fires the cast/swirl
     if (opts.tappable) {
