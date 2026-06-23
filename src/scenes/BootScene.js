@@ -5,6 +5,7 @@ export default class BootScene extends Phaser.Scene {
 
   preload() {
     this.load.image('menu_bg', 'assets/menu-bg.png');
+    this.load.image('wurzelkammer_bg', 'assets/wurzelkammer-bg.png');
   }
 
   create() {

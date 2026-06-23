@@ -17,6 +17,11 @@ import {
   hitPause, FEEL, shakeNormal, shakeHeavy, squashStretch,
   damagePopup, hitBurst, slowMo, critPunch,
 } from '../utils/GameFeel.js';
+import {
+  createSkaldTexture, createDraugrTexture, drawWurzelkammerFloor,
+  spawnMist, spawnLightShaft, drawVignette, drawNorseOrnament,
+  playVerseTriggerFx,
+} from '../utils/SkaldenliedArt.js';
 import { audio } from '../audio/AudioBus.js';
 
 const ROOM_W = 1600;
@@ -24,6 +29,12 @@ const ROOM_H = 900;
 
 export default class SkaldenliedScene extends Phaser.Scene {
   constructor() { super('SkaldenliedScene'); }
+
+  preload() {
+    if (!this.textures.exists('wurzelkammer_bg')) {
+      this.load.image('wurzelkammer_bg', 'assets/wurzelkammer-bg.png');
+    }
+  }
 
   create() {
     audio.unlock();
@@ -38,7 +49,11 @@ export default class SkaldenliedScene extends Phaser.Scene {
 
     this.enemies = this.physics.add.group();
     this.skaldenlied = new Skaldenlied(this, { verses: DEFAULT_VERSES });
-    this.skaldenlied.onVerseFired = (verse) => this._flashVerse(verse);
+    this.skaldenlied.onVerseFired = (verse) => {
+      this._flashVerse(verse);
+      const color = verse.synergy ? 0xFFD66B : 0xcc88ff;
+      playVerseTriggerFx(this, this.player.x, this.player.y, color);
+    };
 
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
 
@@ -62,82 +77,88 @@ export default class SkaldenliedScene extends Phaser.Scene {
   }
 
   _drawRoom() {
-    // Floor — Midgard palette, late-summer-before-storm
-    const g = this.add.graphics();
-    g.fillStyle(0x2E2418, 1).fillRect(0, 0, ROOM_W, ROOM_H);
+    // Base black under-layer
+    const black = this.add.graphics().setDepth(-2);
+    black.fillStyle(0x06000F, 1).fillRect(0, 0, ROOM_W, ROOM_H);
 
-    // Yggdrasil-root cracks across the floor
-    g.lineStyle(2, 0x3D4A2B, 0.6);
-    for (let i = 0; i < 12; i++) {
-      const x = Math.random() * ROOM_W;
-      const y = Math.random() * ROOM_H;
-      g.beginPath();
-      g.moveTo(x, y);
-      let cx = x, cy = y;
-      for (let s = 0; s < 8; s++) {
-        cx += (Math.random() - 0.5) * 60;
-        cy += (Math.random() - 0.5) * 60;
-        g.lineTo(cx, cy);
-      }
-      g.strokePath();
+    // Higgsfield-painted Wurzelkammer background
+    if (this.textures.exists('wurzelkammer_bg')) {
+      this.add.image(ROOM_W / 2, ROOM_H / 2, 'wurzelkammer_bg')
+        .setDisplaySize(ROOM_W, ROOM_H)
+        .setDepth(-1);
+    } else {
+      // Procedural fallback
+      const g = this.add.graphics().setDepth(0);
+      drawWurzelkammerFloor(g, ROOM_W, ROOM_H);
     }
 
-    // Inner glow rim
-    g.lineStyle(3, 0xC9A961, 0.18);
-    g.strokeCircle(ROOM_W / 2, ROOM_H / 2, 300);
-
-    // Outer wall — Helheim mauve creeping in
-    g.fillStyle(0x1A1820, 1);
-    g.fillRect(0, 0, ROOM_W, 40);
-    g.fillRect(0, ROOM_H - 40, ROOM_W, 40);
-    g.fillRect(0, 0, 40, ROOM_H);
-    g.fillRect(ROOM_W - 40, 0, 40, ROOM_H);
-
-    // Three Yggdrasil-root nodes (spawn-corner markers)
-    [
-      { x: 120, y: 120 },
-      { x: ROOM_W - 120, y: 120 },
-      { x: ROOM_W / 2, y: ROOM_H - 120 },
-    ].forEach((n) => {
-      g.fillStyle(0x6B4F5C, 0.6).fillCircle(n.x, n.y, 28);
-      g.lineStyle(2, 0xC9A961, 0.5).strokeCircle(n.x, n.y, 32);
+    // Subtle rune overlay on top of background — pulses with the rhythm
+    const runeOverlay = this.add.graphics().setDepth(2);
+    runeOverlay.lineStyle(1, 0xC9A961, 0.18);
+    const runes = [
+      [[-8, -10], [8, -10], [-8, 10], [8, 10]],
+      [[0, -10], [-8, 10], [8, 10]],
+      [[-6, -10], [-6, 10], [6, -10], [-6, 0]],
+    ];
+    for (let i = 0; i < 6; i++) {
+      const rx = 140 + Math.random() * (ROOM_W - 280);
+      const ry = 140 + Math.random() * (ROOM_H - 280);
+      const rune = runes[Math.floor(Math.random() * runes.length)];
+      runeOverlay.beginPath();
+      runeOverlay.moveTo(rx + rune[0][0], ry + rune[0][1]);
+      for (let p = 1; p < rune.length; p++) {
+        runeOverlay.lineTo(rx + rune[p][0], ry + rune[p][1]);
+      }
+      runeOverlay.strokePath();
+    }
+    this.tweens.add({
+      targets: runeOverlay,
+      alpha: { from: 0.6, to: 1 },
+      duration: 2400,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
     });
+
+    // Atmosphere: drifting mist particles on top of background
+    spawnMist(this, ROOM_W, ROOM_H, 5);
+
+    // Volumetric god-rays through Yggdrasil roots from above
+    spawnLightShaft(this, ROOM_W * 0.45, 0, ROOM_H, 140, 4);
+    spawnLightShaft(this, ROOM_W * 0.7,  0, ROOM_H, 100, 4);
+
+    // Heavy vignette pins to camera
+    drawVignette(this, this.scale.width, this.scale.height, 60);
+
     this._spawnCorners = [
-      { x: 120, y: 120 },
-      { x: ROOM_W - 120, y: 120 },
-      { x: ROOM_W / 2, y: ROOM_H - 120 },
+      { x: 220, y: 200 },
+      { x: ROOM_W - 220, y: 200 },
+      { x: ROOM_W / 2, y: ROOM_H - 180 },
     ];
   }
 
   _createPlayer() {
     const cx = ROOM_W / 2, cy = ROOM_H / 2;
-    // Procedural Skalde-Sprite: blue cloak with gold hood-edge
-    const g = this.add.graphics();
-    // body cloak
-    g.fillStyle(0x2B2D3A, 1).fillEllipse(0, 8, 28, 38);
-    // gold hood rim
-    g.lineStyle(2, 0xC9A961, 1).strokeEllipse(0, 8, 28, 38);
-    // hood
-    g.fillStyle(0x1F2933, 1).fillCircle(0, -8, 14);
-    g.lineStyle(2, 0xC9A961, 1).strokeCircle(0, -8, 14);
-    // bone-staff
-    g.lineStyle(2.5, 0xE8DCC0, 1);
-    g.lineBetween(14, 16, 22, -20);
-    g.fillStyle(0xC9A961, 1).fillCircle(22, -22, 4);
+    const key = createSkaldTexture(this);
 
-    g.generateTexture('__skald_tex', 48, 48);
-    g.destroy();
-
-    this.player = this.physics.add.sprite(cx, cy, '__skald_tex');
-    this.player.setCircle(16, 8, 8);
+    this.player = this.physics.add.sprite(cx, cy, key);
+    this.player.setCircle(18, 30, 36);
     this.player.setCollideWorldBounds(true);
     this.player.maxHp = 100;
     this.player.hp = 100;
     this.player.speed = 220;
     this.player.setDepth(20);
 
-    // Soft glow under the skald
-    this.playerGlow = this.add.circle(cx, cy, 32, 0xC9A961, 0.15).setDepth(15);
+    // Soft golden glow under the skald — anchored, pulses
+    this.playerGlow = this.add.circle(cx, cy, 42, 0xC9A961, 0.18).setDepth(15);
+    this.tweens.add({
+      targets: this.playerGlow,
+      alpha: { from: 0.12, to: 0.24 },
+      duration: 1800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
   }
 
   _createUI() {
@@ -175,16 +196,19 @@ export default class SkaldenliedScene extends Phaser.Scene {
       stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(82).setScrollFactor(0);
 
-    // Verse panel — bottom strip
-    const panelH = 110;
+    // Verse panel — bottom strip with Norse ornament
+    const panelH = 120;
     const panelY = H - panelH;
     const panel = this.add.graphics().setDepth(80).setScrollFactor(0);
-    panel.fillStyle(0x000000, 0.78).fillRect(0, panelY, W, panelH);
-    panel.lineStyle(1, 0xC9A961, 0.45).lineBetween(0, panelY, W, panelY);
+    // Layered panel background — darker at bottom
+    panel.fillStyle(0x000000, 0.85).fillRect(0, panelY, W, panelH);
+    panel.fillStyle(0x0A0612, 0.6).fillRect(0, panelY + panelH * 0.5, W, panelH * 0.5);
+    // Top border ornament
+    drawNorseOrnament(panel, 0, panelY, W, panelH);
 
-    this.add.text(W / 2, panelY + 12, 'DEIN LIED', {
-      fontFamily: "'Cinzel', serif", fontSize: '11px',
-      color: CSS_COLORS.goldLight, fontStyle: 'bold',
+    this.add.text(W / 2, panelY + 16, '— DEIN LIED —', {
+      fontFamily: "'Cinzel', serif", fontSize: '12px',
+      color: CSS_COLORS.goldLight, fontStyle: 'bold', letterSpacing: 4,
     }).setOrigin(0.5).setDepth(82).setScrollFactor(0);
 
     this._verseTexts = [];
@@ -194,17 +218,33 @@ export default class SkaldenliedScene extends Phaser.Scene {
       const stab = v.trigger.stab;
       const stabColor = v.synergy ? CSS_COLORS.goldLight : CSS_COLORS.purpleLight;
 
-      const t = this.add.text(cx, panelY + 36, `${i + 1}.  ${v.text}`, {
-        fontFamily: "'Lora', serif", fontSize: '12px',
-        color: '#e0d8c0', align: 'center', wordWrap: { width: verseGap - 24 },
+      // Vertical divider between verses
+      if (i > 0) {
+        const divX = verseGap * i;
+        const div = this.add.graphics().setDepth(81).setScrollFactor(0);
+        div.lineStyle(1, 0xC9A961, 0.25);
+        div.lineBetween(divX, panelY + 32, divX, panelY + panelH - 12);
+      }
+
+      // Stab-letter badge — large alliteration letter
+      const badge = this.add.text(cx - 90, panelY + 50, stab, {
+        fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '32px',
+        color: stabColor, fontStyle: 'bold',
+        stroke: '#000', strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(82).setScrollFactor(0).setAlpha(0.55);
+
+      const t = this.add.text(cx + 10, panelY + 42, v.text, {
+        fontFamily: "'Lora', serif", fontSize: '13px',
+        color: '#e8dcc0', align: 'left', wordWrap: { width: verseGap - 100 },
+        lineSpacing: 2,
       }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
 
-      const sub = this.add.text(cx, panelY + 82, `${v.trigger.desc}`, {
+      const sub = this.add.text(cx + 10, panelY + 90, v.trigger.desc, {
         fontFamily: "'Space Mono', monospace", fontSize: '9px',
-        color: '#7a7080', align: 'center', wordWrap: { width: verseGap - 24 },
+        color: '#7a7080', align: 'left', wordWrap: { width: verseGap - 100 },
       }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
 
-      this._verseTexts.push({ text: t, sub, container: null });
+      this._verseTexts.push({ text: t, sub, badge });
     });
 
     // ESC hint
@@ -216,14 +256,27 @@ export default class SkaldenliedScene extends Phaser.Scene {
   _flashVerse(verse) {
     const idx = DEFAULT_VERSES.indexOf(verse);
     if (idx < 0 || !this._verseTexts[idx]) return;
-    const t = this._verseTexts[idx].text;
-    t.setColor(verse.synergy ? '#FFD66B' : '#cc88ff');
+    const entry = this._verseTexts[idx];
+    const t = entry.text;
+    const badge = entry.badge;
+    const color = verse.synergy ? '#FFD66B' : '#cc88ff';
+    t.setColor(color);
+    if (badge) {
+      badge.setAlpha(1);
+      this.tweens.add({
+        targets: badge,
+        scale: { from: 1.0, to: 1.3 },
+        duration: 180,
+        yoyo: true,
+        onComplete: () => { badge.setScale(1); badge.setAlpha(0.55); },
+      });
+    }
     this.tweens.add({
       targets: t,
-      scale: { from: 1.0, to: 1.15 },
-      duration: 120,
+      scale: { from: 1.0, to: 1.12 },
+      duration: 140,
       yoyo: true,
-      onComplete: () => t.setColor('#e0d8c0'),
+      onComplete: () => t.setColor('#e8dcc0'),
     });
   }
 
@@ -270,21 +323,10 @@ export default class SkaldenliedScene extends Phaser.Scene {
     const ox = corner.x + (Math.random() - 0.5) * offset;
     const oy = corner.y + (Math.random() - 0.5) * offset;
 
-    const key = '__draugr_tex';
-    if (!this.textures.exists(key)) {
-      const g = this.add.graphics();
-      g.fillStyle(0x5C5470, 1).fillEllipse(16, 18, 22, 30);
-      g.lineStyle(1.5, 0x2B2D3A, 1).strokeEllipse(16, 18, 22, 30);
-      g.fillStyle(0xC9C4D1, 1).fillCircle(16, 10, 8);
-      g.lineStyle(1, 0x2B2D3A, 1).strokeCircle(16, 10, 8);
-      g.fillStyle(0xff4422, 0.9).fillCircle(14, 8, 1.5);
-      g.fillStyle(0xff4422, 0.9).fillCircle(18, 8, 1.5);
-      g.generateTexture(key, 32, 36);
-      g.destroy();
-    }
+    const key = createDraugrTexture(this);
 
     const e = this.physics.add.sprite(ox, oy, key);
-    e.setCircle(11, 5, 7);
+    e.setCircle(14, 26, 22);
     e.hp = 28;
     e.maxHp = 28;
     e.damage = 8;
