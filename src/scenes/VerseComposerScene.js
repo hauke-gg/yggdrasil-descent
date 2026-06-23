@@ -32,14 +32,17 @@ export default class VerseComposerScene extends Phaser.Scene {
       fontSize: '12px', color: '#a89888',
     }).setOrigin(0.5).setDepth(10);
 
-    // Library cards — 3×3 grid
+    // Library cards — 3×3 grid, scale to viewport
     this._chosenIds = [];
     this._libraryCards = [];
-    const lw = 220, lh = 95, lgap = 14;
     const cols = 3, rows = Math.ceil(VERSE_LIBRARY.length / cols);
+    const lgap = 10;
+    const availW = W - 40;
+    const lw = Math.min(220, Math.floor((availW - (cols - 1) * lgap) / cols));
+    const lh = Math.min(95, Math.floor((H * 0.45 - (rows - 1) * lgap) / rows));
     const gridW = cols * lw + (cols - 1) * lgap;
     const startX = W / 2 - gridW / 2 + lw / 2;
-    const startY = 130;
+    const startY = 110;
     VERSE_LIBRARY.forEach((lib, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
@@ -59,11 +62,14 @@ export default class VerseComposerScene extends Phaser.Scene {
       color: '#FFD66B', fontStyle: 'bold', letterSpacing: 4,
     }).setOrigin(0.5).setDepth(10);
 
-    // Three slots
-    const sw = 280, sh = 80, sgap = 24;
+    // Three slots — also scale
+    const sgap = 16;
+    const sAvailW = W - 60;
+    const sw = Math.min(280, Math.floor((sAvailW - 2 * sgap) / 3));
+    const sh = 70;
     const slotsW = 3 * sw + 2 * sgap;
     const slotStartX = W / 2 - slotsW / 2 + sw / 2;
-    const slotY = dividerY + 64;
+    const slotY = dividerY + 56;
     this._slots = [];
     for (let i = 0; i < 3; i++) {
       const cx = slotStartX + i * (sw + sgap);

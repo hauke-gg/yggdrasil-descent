@@ -15,6 +15,8 @@ import Skaldenlied from '../systems/Skaldenlied.js';
 import { DEFAULT_VERSES, buildVerses } from '../data/verses.js';
 import { SKALDS, DEFAULT_SKALD } from '../data/skalds.js';
 import { GODS, BOON_LIBRARY, rollBoonChoice } from '../data/boons.js';
+import { isMobile } from '../utils/MobileDetect.js';
+import VirtualJoystick from '../ui/VirtualJoystick.js';
 import {
   hitPause, FEEL, shakeNormal, shakeHeavy, squashStretch,
   damagePopup, hitBurst, slowMo, critPunch,
@@ -75,6 +77,12 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this.skaldenlied.onComboChange = (combo) => this._updateComboUI(combo);
 
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+
+    // Mobile touch controls
+    this._mobile = isMobile(this);
+    if (this._mobile) {
+      this._joystick = new VirtualJoystick(this);
+    }
 
     // Show onboarding splash on first entry (or if skipped previously, still show)
     this._showOnboarding();
@@ -267,45 +275,66 @@ export default class SkaldenliedScene extends Phaser.Scene {
       stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
 
-    // Compact action bar — 4 square buttons centered at the bottom
+    // Compact action bar
+    // Desktop: centered at the bottom in a single row
+    // Mobile: 2×2 grid in the bottom-right corner (thumb-friendly)
     this._actionButtons = [];
-    const btnSize = 56;
-    const btnGap = 14;
-    const btnCount = 4;
-    const totalW = btnCount * btnSize + (btnCount - 1) * btnGap;
-    const startX = W / 2 - totalW / 2 + btnSize / 2;
-    const btnY = H - btnSize / 2 - 12;
+    const onMobile = isMobile(this);
+    const btnSize = onMobile ? 78 : 56;
+    const btnGap = onMobile ? 12 : 14;
+    let btnPositions;
+    if (onMobile) {
+      const gridW = 2 * btnSize + btnGap;
+      const gridH = 2 * btnSize + btnGap;
+      const baseX = W - gridW - 22;
+      const baseY = H - gridH - 22;
+      btnPositions = [
+        { cx: baseX + btnSize / 2,                    cy: baseY + btnSize / 2 },
+        { cx: baseX + btnSize + btnGap + btnSize / 2, cy: baseY + btnSize / 2 },
+        { cx: baseX + btnSize / 2,                    cy: baseY + btnSize + btnGap + btnSize / 2 },
+        { cx: baseX + btnSize + btnGap + btnSize / 2, cy: baseY + btnSize + btnGap + btnSize / 2 },
+      ];
+    } else {
+      const totalW = 4 * btnSize + 3 * btnGap;
+      const startX = W / 2 - totalW / 2 + btnSize / 2;
+      const btnY = H - btnSize / 2 - 12;
+      btnPositions = [0, 1, 2, 3].map(i => ({
+        cx: startX + i * (btnSize + btnGap),
+        cy: btnY,
+      }));
+      const bar = this.add.graphics().setDepth(80).setScrollFactor(0);
+      bar.fillStyle(0x000000, 0.4).fillRect(0, btnY - btnSize / 2 - 6, W, btnSize + 12);
+      bar.lineStyle(1, 0xC9A961, 0.25)
+        .lineBetween(0, btnY - btnSize / 2 - 6, W, btnY - btnSize / 2 - 6);
+    }
 
-    // Subtle bar background — narrow strip
-    const bar = this.add.graphics().setDepth(80).setScrollFactor(0);
-    bar.fillStyle(0x000000, 0.4).fillRect(0, btnY - btnSize / 2 - 6, W, btnSize + 12);
-    bar.lineStyle(1, 0xC9A961, 0.25)
-      .lineBetween(0, btnY - btnSize / 2 - 6, W, btnY - btnSize / 2 - 6);
-
-    (this._verses || DEFAULT_VERSES).forEach((v, i) => {
-      const cx = startX + i * (btnSize + btnGap);
+    const verses = this._verses || DEFAULT_VERSES;
+    verses.forEach((v, i) => {
+      const pos = btnPositions[i];
       const stabColor = v.synergy ? 0xFFD66B : 0xcc88ff;
       this._actionButtons.push(
-        this._createActionButton(cx, btnY, btnSize, {
+        this._createActionButton(pos.cx, pos.cy, btnSize, {
           slot: i,
-          keyLabel: String(i + 1),
+          keyLabel: onMobile ? '' : String(i + 1),
           glyph: v.trigger.stab,
           glyphColor: stabColor,
           subLabel: this._verbShort(v.verb.id),
           tooltipText: v.text,
+          tappable: onMobile,
         })
       );
     });
 
     // 4th button — Skalden-Wirbel (SPACE)
-    const swirlX = startX + 3 * (btnSize + btnGap);
-    this._swirlButton = this._createActionButton(swirlX, btnY, btnSize, {
+    const swirlPos = btnPositions[3];
+    this._swirlButton = this._createActionButton(swirlPos.cx, swirlPos.cy, btnSize, {
       slot: -1,
-      keyLabel: '⎵',
+      keyLabel: onMobile ? '' : '⎵',
       glyph: '✦',
       glyphColor: 0xFFB45A,
       subLabel: 'Wirbel',
       tooltipText: 'Skalden-Wirbel — 360° AoE-Stoß',
+      tappable: onMobile,
     });
 
     // Verse pop-up text holder — shows full stab-rhyme when a verse fires
@@ -350,27 +379,42 @@ export default class SkaldenliedScene extends Phaser.Scene {
     };
     draw(true);
 
-    // Glyph in center
+    // Glyph in center (scales with size)
+    const glyphSize = Math.round(size * 0.55);
     const glyph = this.add.text(cx, cy, opts.glyph, {
-      fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '30px',
+      fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: glyphSize + 'px',
       color: colorCss, fontStyle: 'bold',
       stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(82).setScrollFactor(0);
 
-    // Key badge (top-left)
-    const keyBg = this.add.graphics().setDepth(82).setScrollFactor(0);
-    keyBg.fillStyle(0x000000, 0.85).fillRoundedRect(cx - r - 4, cy - r - 4, 18, 18, 3);
-    keyBg.lineStyle(1, 0xC9A961, 0.8).strokeRoundedRect(cx - r - 4, cy - r - 4, 18, 18, 3);
-    const keyText = this.add.text(cx - r + 5, cy - r + 5, opts.keyLabel, {
-      fontFamily: "'Cinzel', serif", fontSize: '11px',
-      color: '#FFD66B', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(83).setScrollFactor(0);
+    // Key badge — only on desktop
+    let keyBg = null, keyText = null;
+    if (opts.keyLabel) {
+      keyBg = this.add.graphics().setDepth(82).setScrollFactor(0);
+      keyBg.fillStyle(0x000000, 0.85).fillRoundedRect(cx - r - 4, cy - r - 4, 18, 18, 3);
+      keyBg.lineStyle(1, 0xC9A961, 0.8).strokeRoundedRect(cx - r - 4, cy - r - 4, 18, 18, 3);
+      keyText = this.add.text(cx - r + 5, cy - r + 5, opts.keyLabel, {
+        fontFamily: "'Cinzel', serif", fontSize: '11px',
+        color: '#FFD66B', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(83).setScrollFactor(0);
+    }
 
     // Sub label below
-    const sub = this.add.text(cx, cy + r + 9, opts.subLabel, {
+    const sub = this.add.text(cx, cy + r + 8, opts.subLabel, {
       fontFamily: "'Space Mono', monospace", fontSize: '9px',
       color: dimCss, letterSpacing: 1,
     }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
+
+    // Tap zone — only on mobile, fires the cast/swirl
+    if (opts.tappable) {
+      const hit = this.add.rectangle(cx, cy, size + 8, size + 8, 0x000000, 0)
+        .setInteractive({ useHandCursor: true })
+        .setScrollFactor(0).setDepth(84);
+      hit.on('pointerdown', () => {
+        if (opts.slot >= 0) this._tryCast(opts.slot);
+        else this._trySwirl();
+      });
+    }
 
     return {
       slot: opts.slot,
@@ -741,25 +785,32 @@ export default class SkaldenliedScene extends Phaser.Scene {
     const ov = this.add.graphics().setDepth(180).setScrollFactor(0);
     ov.fillStyle(0x000000, 0.55).fillRect(0, 0, W, H);
 
+    const onMobile = isMobile(this);
+
     const title = this.add.text(W / 2, H * 0.30, 'BEFEHLE', {
       fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '20px',
       color: '#FFD66B', fontStyle: 'bold', letterSpacing: 6,
       stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(181).setScrollFactor(0).setAlpha(0);
 
-    const moveHint = this.add.text(W / 2, H * 0.36, 'WASD / Pfeiltasten — bewegen', {
+    const moveHint = this.add.text(W / 2, H * 0.36,
+      onMobile ? 'Linker Daumen — Joystick zum Bewegen' : 'WASD / Pfeiltasten — bewegen', {
       fontFamily: "'Cinzel', serif", fontSize: '14px',
       color: '#e8dcc0', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(181).setScrollFactor(0).setAlpha(0);
 
     const versHint = this.add.text(W / 2, H * 0.43,
-      '1 · 2 · 3   —   aktive Verse (Tasten gehören zu deinem Lied)', {
+      onMobile
+        ? 'Rechte Buttons   —   tippen, um Verse zu casten'
+        : '1 · 2 · 3   —   aktive Verse (Tasten gehören zu deinem Lied)', {
       fontFamily: "'Cinzel', serif", fontSize: '14px',
       color: '#cc88ff', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(181).setScrollFactor(0).setAlpha(0);
 
     const swirlHint = this.add.text(W / 2, H * 0.49,
-      'Leertaste   —   Skalden-Wirbel (360° Stoß, 4 Sek Cooldown)', {
+      onMobile
+        ? '✦ — Skalden-Wirbel (360° Stoß, 4 Sek Cooldown)'
+        : 'Leertaste   —   Skalden-Wirbel (360° Stoß, 4 Sek Cooldown)', {
       fontFamily: "'Cinzel', serif", fontSize: '14px',
       color: '#FFB45A', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(181).setScrollFactor(0).setAlpha(0);
@@ -771,7 +822,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(181).setScrollFactor(0).setAlpha(0);
 
     const skip = this.add.text(W / 2, H * 0.64,
-      '(Beliebige Taste — beginnen)', {
+      onMobile ? '(Tippen — beginnen)' : '(Beliebige Taste — beginnen)', {
       fontFamily: "'Space Mono', monospace", fontSize: '10px',
       color: '#7a7080',
     }).setOrigin(0.5).setDepth(181).setScrollFactor(0).setAlpha(0);
@@ -791,24 +842,32 @@ export default class SkaldenliedScene extends Phaser.Scene {
       });
       this.input.keyboard.off('keydown', dismiss);
     };
-    // After 4.2s OR any keypress
+    // After 4.2s OR any keypress / tap
     this.time.delayedCall(4200, dismiss);
     this.input.keyboard.on('keydown', dismiss);
+    this.input.on('pointerdown', dismiss);
   }
 
   update(time, delta) {
     if (!this.player || !this.player.active) return;
 
-    // Movement
+    // Movement — keyboard always, joystick on mobile
     const k = this.keys;
     let vx = 0, vy = 0;
     if (k.W.isDown || k.UP.isDown)    vy = -1;
     if (k.S.isDown || k.DOWN.isDown)  vy = 1;
     if (k.A.isDown || k.LEFT.isDown)  vx = -1;
     if (k.D.isDown || k.RIGHT.isDown) vx = 1;
+    if (this._joystick) {
+      const jv = this._joystick.getVector();
+      if (Math.abs(jv.x) > 0.05 || Math.abs(jv.y) > 0.05) {
+        vx = jv.x;
+        vy = jv.y;
+      }
+    }
     if (vx || vy) {
-      const n = Math.hypot(vx, vy);
-      this.player.setVelocity(vx / n * this.player.speed, vy / n * this.player.speed);
+      const len = Math.hypot(vx, vy) || 1;
+      this.player.setVelocity(vx / len * this.player.speed, vy / len * this.player.speed);
       this.skaldenlied.markAction();
     } else {
       this.player.setVelocity(0, 0);
@@ -1170,8 +1229,11 @@ export default class SkaldenliedScene extends Phaser.Scene {
       align: 'center', lineSpacing: 8,
     }).setOrigin(0.5).setDepth(201).setScrollFactor(0).setAlpha(0);
 
+    const onMobileGO = isMobile(this);
     const hint = this.add.text(W / 2, H * 0.88,
-      '↵ ENTER — Steige erneut hinab        ESC — Verlasse den Brunnen', {
+      onMobileGO
+        ? 'Tippen — Steige erneut hinab'
+        : '↵ ENTER — Steige erneut hinab        ESC — Verlasse den Brunnen', {
       fontFamily: "'Space Mono', monospace", fontSize: '11px',
       color: '#5a4a6a', letterSpacing: 2,
     }).setOrigin(0.5).setDepth(201).setScrollFactor(0).setAlpha(0);
@@ -1187,6 +1249,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this.tweens.add(tlOpts(hint, 4400));
 
     this.input.keyboard.once('keydown-ENTER', () => this.scene.restart());
+    this.input.once('pointerdown', () => this.scene.restart());
   }
 
   _returnToMenu() {
@@ -1199,5 +1262,6 @@ export default class SkaldenliedScene extends Phaser.Scene {
     audio.stopCombatPulse();
     audio.stopAmbientDrone();
     this.skaldenlied?.destroy();
+    this._joystick?.destroy();
   }
 }

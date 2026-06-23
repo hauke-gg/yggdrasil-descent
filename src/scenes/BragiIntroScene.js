@@ -81,16 +81,18 @@ export default class BragiIntroScene extends Phaser.Scene {
     // Begin typewriter cascade
     this._typeLine(0, 2400);
 
-    // CTA at the bottom
+    // CTA at the bottom — touch-aware
+    const onTouch = (typeof window !== 'undefined') &&
+      (('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0);
     this._cta = this.add.text(W / 2, H * 0.92,
-      '↵ ENTER — Steige hinab', {
+      onTouch ? 'Tippen — Steige hinab' : '↵ ENTER — Steige hinab', {
       fontFamily: "'Cinzel', serif", fontSize: '14px',
       color: CSS_COLORS.goldLight, letterSpacing: 3,
       stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(20).setAlpha(0);
 
     this._ctaHint = this.add.text(W / 2, H * 0.96,
-      'oder klicke', {
+      onTouch ? '' : 'oder klicke', {
       fontFamily: "'Space Mono', monospace", fontSize: '10px',
       color: '#5a4a6a',
     }).setOrigin(0.5).setDepth(20).setAlpha(0);

@@ -31,12 +31,14 @@ export default class SkaldSelectScene extends Phaser.Scene {
       fontSize: '14px', color: '#a89888',
     }).setOrigin(0.5).setDepth(10);
 
-    // Three cards
-    const cardW = 280, cardH = 460;
-    const cardGap = 22;
+    // Three cards — scale to viewport
+    const cardGap = 16;
+    const availableW = W - 60;
+    const cardW = Math.min(280, Math.floor((availableW - 2 * cardGap) / 3));
+    const cardH = Math.min(460, Math.max(360, H - 160));
     const totalW = 3 * cardW + 2 * cardGap;
     const startX = W / 2 - totalW / 2 + cardW / 2;
-    const cardY = H / 2 + 38;
+    const cardY = H / 2 + Math.max(20, (H - cardH - 120) / 2);
 
     const order = ['hakon', 'solveig', 'brandr'];
     this._cards = [];
@@ -46,7 +48,11 @@ export default class SkaldSelectScene extends Phaser.Scene {
     });
 
     // Footer instructions
-    this.add.text(W / 2, H - 22, 'Klick wählt   ·   ESC verlässt den Brunnen', {
+    const onTouch = (typeof window !== 'undefined') &&
+      (('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0);
+    this.add.text(W / 2, H - 14, onTouch
+      ? 'Tippe eine Karte zum Wählen'
+      : 'Klick wählt   ·   ESC verlässt den Brunnen', {
       fontFamily: "'Space Mono', monospace", fontSize: '10px',
       color: '#5a4a6a', letterSpacing: 2,
     }).setOrigin(0.5).setDepth(10);
