@@ -35,10 +35,11 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
     if (!this.active || !player || !player.active) return;
 
     const angle = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
-    this.setVelocity(
-      Math.cos(angle) * this.speed,
-      Math.sin(angle) * this.speed
-    );
+    const vx = Math.cos(angle) * this.speed;
+    this.setVelocity(vx, Math.sin(angle) * this.speed);
+    // Face direction of movement
+    if (vx < 0) this.setFlipX(true);
+    else if (vx > 0) this.setFlipX(false);
 
     if (this._hpVisible) this._drawHpBar();
   }

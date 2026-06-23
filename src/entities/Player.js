@@ -87,11 +87,13 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
       this.setVelocity(0, 0);
       return;
     }
-    // Normalisieren damit Diagonale nicht schneller ist
     const len = Math.sqrt(velocityX ** 2 + velocityY ** 2);
     this.setVelocity(
       (velocityX / len) * this.speed,
       (velocityY / len) * this.speed
     );
+    // Flip sprite to face movement direction
+    if (velocityX < -10) this.setFlipX(true);
+    else if (velocityX > 10) this.setFlipX(false);
   }
 }

@@ -52,112 +52,236 @@ export default class DungeonScene extends Phaser.Scene {
     const g = this.add.graphics().setDepth(-3);
     const cx = WORLD_SIZE / 2, cy = WORLD_SIZE / 2;
 
-    // Dark void outer
-    g.fillStyle(0x030108, 1);
+    // Outer void
+    g.fillStyle(0x020104, 1);
     g.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
 
-    // Midgaard biome: dark stone ruins floor
-    g.fillStyle(0x0e0c18, 1);
-    g.fillCircle(cx, cy, 1800);
-    g.fillStyle(0x12101e, 1);
-    g.fillCircle(cx, cy, 1400);
-    g.fillStyle(0x161422, 1);
-    g.fillCircle(cx, cy, 900);
+    // Biome base fills (behind tiles)
+    g.fillStyle(0x130a0a, 1); // Helheim base: blood ash
+    g.fillCircle(cx, cy, 2100);
+    g.fillStyle(0x060c16, 1); // Jötunheim base: deep ice navy
+    g.fillCircle(cx, cy, 1600);
+    g.fillStyle(0x0a140a, 1); // Midgard base: dark forest
+    g.fillCircle(cx, cy, 800);
 
-    // Stone floor pattern (large tiles with variation)
+    // --- TILE LAYER ---
     const tileG = this.add.graphics().setDepth(-2);
     const TILE = 64;
-    for (let x = 0; x < WORLD_SIZE; x += TILE) {
-      for (let y = 0; y < WORLD_SIZE; y += TILE) {
-        const dx = x - cx, dy = y - cy;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist > 1900) continue;
-        // Stone tile base
-        const shade = dist < 900 ? 0x1e1c2c : dist < 1400 ? 0x181626 : 0x141220;
-        tileG.fillStyle(shade, 1);
-        tileG.fillRect(x+1, y+1, TILE-2, TILE-2);
-        // Tile grout lines
-        tileG.lineStyle(1, 0x0a0818, 0.8);
-        tileG.strokeRect(x+1, y+1, TILE-2, TILE-2);
-        // Subtle crack / variation in some tiles
-        const hash = (x * 7 + y * 13) % 100;
-        if (hash < 8) {
-          tileG.lineStyle(1, 0x0a0816, 0.5);
-          tileG.lineBetween(x+8, y+TILE*0.3, x+TILE*0.6, y+TILE*0.7);
-        }
-        if (hash > 92) {
-          tileG.fillStyle(0x0a0816, 0.3);
-          tileG.fillRect(x+TILE*0.2, y+TILE*0.2, TILE*0.3, TILE*0.3);
+    for (let tx = 0; tx < WORLD_SIZE; tx += TILE) {
+      for (let ty = 0; ty < WORLD_SIZE; ty += TILE) {
+        const dx = tx + TILE / 2 - cx;
+        const dy = ty + TILE / 2 - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > 2080) continue;
+
+        const h1 = (tx * 7 + ty * 13) % 100;
+        const h2 = (tx * 11 + ty * 19) % 100;
+
+        if (dist < 800) {
+          // MIDGARD: dark green mossy stone
+          const shade = h1 < 25 ? 0x111a11 : h1 < 60 ? 0x141e14 : 0x182218;
+          tileG.fillStyle(shade, 1);
+          tileG.fillRect(tx + 1, ty + 1, TILE - 2, TILE - 2);
+          // Moss patches in tile corners
+          if (h1 < 14) {
+            tileG.fillStyle(0x1c3419, 0.75);
+            tileG.fillRect(tx + 1, ty + 1, 18, 18);
+          }
+          if (h2 < 10) {
+            tileG.fillStyle(0x1a3017, 0.6);
+            tileG.fillRect(tx + TILE - 19, ty + TILE - 19, 18, 18);
+          }
+          // Green grout
+          tileG.lineStyle(1, 0x090f09, 0.9);
+          tileG.strokeRect(tx + 1, ty + 1, TILE - 2, TILE - 2);
+          // Stone crack on some tiles
+          if (h1 > 90) {
+            tileG.lineStyle(1, 0x0d160d, 0.55);
+            tileG.lineBetween(tx + 10, ty + 22, tx + 42, ty + 52);
+          }
+          // Faint rune shimmer near altar
+          if (h1 < 5 && dist < 560) {
+            tileG.fillStyle(0x33cc55, 0.05);
+            tileG.fillRect(tx, ty, TILE, TILE);
+          }
+        } else if (dist < 1600) {
+          // JÖTUNHEIM: ice-blue crystalline
+          const shade = h1 < 25 ? 0x080f1c : h1 < 60 ? 0x0b1422 : 0x0e1a2c;
+          tileG.fillStyle(shade, 1);
+          tileG.fillRect(tx + 1, ty + 1, TILE - 2, TILE - 2);
+          // Frost crack veins
+          if (h1 < 22) {
+            tileG.lineStyle(1, 0x1e4488, 0.38);
+            tileG.lineBetween(tx + 6, ty + TILE * 0.38, tx + TILE * 0.72, ty + TILE - 6);
+          }
+          if (h2 < 16) {
+            tileG.lineStyle(1, 0x2255aa, 0.3);
+            tileG.lineBetween(tx + TILE * 0.28, ty + 5, tx + TILE - 6, ty + TILE * 0.62);
+          }
+          // Frost corner shard
+          if (h1 > 86) {
+            tileG.fillStyle(0x3366bb, 0.18);
+            tileG.fillTriangle(tx + 1, ty + 1, tx + 22, ty + 1, tx + 1, ty + 22);
+          }
+          // Ice grout
+          tileG.lineStyle(1, 0x050c18, 0.9);
+          tileG.strokeRect(tx + 1, ty + 1, TILE - 2, TILE - 2);
+        } else {
+          // HELHEIM: dark ash red bone
+          const shade = h1 < 25 ? 0x130808 : h1 < 60 ? 0x170b0b : 0x1b0d0d;
+          tileG.fillStyle(shade, 1);
+          tileG.fillRect(tx + 1, ty + 1, TILE - 2, TILE - 2);
+          // Ash patch
+          if (h1 < 18) {
+            tileG.fillStyle(0x221010, 0.55);
+            tileG.fillRect(tx + (h1 % 36), ty + (h2 % 36), 14, 14);
+          }
+          // Ember glow on tile surface
+          if (h1 > 93) {
+            tileG.fillStyle(0xcc2200, 0.14);
+            tileG.fillCircle(tx + TILE / 2, ty + TILE / 2, 9);
+          }
+          // Bone-gray seam
+          tileG.lineStyle(1, 0x0e0606, 0.9);
+          tileG.strokeRect(tx + 1, ty + 1, TILE - 2, TILE - 2);
+          if (h2 > 89) {
+            tileG.lineStyle(1, 0x404040, 0.18);
+            tileG.lineBetween(tx + 8, ty + 32, tx + 56, ty + 40);
+          }
         }
       }
     }
 
-    // Runic circles — main altar glow
-    const runeG = this.add.graphics().setDepth(-1);
+    // --- DECORATIONS ---
+    const decoG = this.add.graphics().setDepth(-1);
 
-    // Inner sacred circle — bright purple rune ring
-    runeG.lineStyle(3, 0x6644cc, 0.8);
-    runeG.strokeCircle(cx, cy, 300);
-    // Glow fill at center altar
-    runeG.fillStyle(0x3311aa, 0.08);
-    runeG.fillCircle(cx, cy, 300);
-
-    // Mid-range circles
-    runeG.lineStyle(2, 0x4422aa, 0.5);
-    runeG.strokeCircle(cx, cy, 600);
-    runeG.lineStyle(1, 0x331188, 0.35);
-    runeG.strokeCircle(cx, cy, 900);
-    runeG.lineStyle(1, 0x220066, 0.25);
-    runeG.strokeCircle(cx, cy, 1200);
-    runeG.lineStyle(1, 0x110044, 0.2);
-    runeG.strokeCircle(cx, cy, 1600);
-
-    // Cardinal rune lines — Norse cross pattern
-    runeG.lineStyle(1, 0x5533bb, 0.35);
-    [0, 45, 90, 135].forEach(deg => {
-      const rad = deg * Math.PI / 180;
-      runeG.lineBetween(cx + Math.cos(rad)*120, cy + Math.sin(rad)*120,
-                        cx + Math.cos(rad)*1700, cy + Math.sin(rad)*1700);
-      runeG.lineBetween(cx - Math.cos(rad)*120, cy - Math.sin(rad)*120,
-                        cx - Math.cos(rad)*1700, cy - Math.sin(rad)*1700);
-    });
-
-    // Rune notches on inner circle (8 equidistant marks)
+    // === MIDGARD: Green runic altar ===
+    decoG.fillStyle(0x22aa33, 0.07);
+    decoG.fillCircle(cx, cy, 290);
+    decoG.lineStyle(3, 0x44cc55, 0.85);
+    decoG.strokeCircle(cx, cy, 290);
+    // Inner glow ring
+    decoG.lineStyle(2, 0x33aa44, 0.5);
+    decoG.strokeCircle(cx, cy, 560);
+    // 8 runic notch dots
     for (let a = 0; a < 8; a++) {
-      const rad = (a / 8) * Math.PI * 2;
-      const ix = cx + Math.cos(rad) * 300;
-      const iy = cy + Math.sin(rad) * 300;
-      runeG.fillStyle(0x8866ff, 0.7);
-      runeG.fillCircle(ix, iy, 5);
+      const r = (a / 8) * Math.PI * 2;
+      decoG.fillStyle(0x66ff88, 0.75);
+      decoG.fillCircle(cx + Math.cos(r) * 290, cy + Math.sin(r) * 290, 5);
     }
-
-    // Atmospheric fog spots (dark pools in the world)
-    runeG.fillStyle(0x020106, 0.5);
-    [[cx-600,cy-700,280],[cx+720,cy+520,220],[cx-820,cy+640,320],[cx+640,cy-820,240]].forEach(([x,y,r]) => {
-      runeG.fillCircle(x, y, r);
+    // Cardinal lines
+    decoG.lineStyle(1, 0x33aa44, 0.3);
+    [0, 45, 90, 135].forEach(deg => {
+      const r = deg * Math.PI / 180;
+      decoG.lineBetween(cx + Math.cos(r) * 100, cy + Math.sin(r) * 100,
+                        cx + Math.cos(r) * 720, cy + Math.sin(r) * 720);
+      decoG.lineBetween(cx - Math.cos(r) * 100, cy - Math.sin(r) * 100,
+                        cx - Math.cos(r) * 720, cy - Math.sin(r) * 720);
+    });
+    // Midgard stone pillars with green glow
+    [
+      [cx - 190, cy - 230], [cx + 210, cy - 185],
+      [cx - 225, cy + 195], [cx + 185, cy + 230],
+      [cx + 430, cy - 70],  [cx - 450, cy + 90],
+      [cx + 70,  cy - 440], [cx - 85,  cy + 450],
+    ].forEach(([rx, ry]) => {
+      decoG.fillStyle(0x121e12, 1);
+      decoG.fillRect(rx - 14, ry - 14, 28, 28);
+      decoG.fillStyle(0x1e2e1e, 1);
+      decoG.fillRect(rx - 10, ry - 10, 16, 16);
+      decoG.fillStyle(0x253a25, 1);
+      decoG.fillRect(rx - 6, ry - 6, 8, 8);
+      decoG.lineStyle(1, 0x44aa44, 0.5);
+      decoG.strokeRect(rx - 14, ry - 14, 28, 28);
+      decoG.fillStyle(0x33cc55, 0.11);
+      decoG.fillCircle(rx, ry, 22);
+      decoG.fillStyle(0x44dd66, 0.05);
+      decoG.fillCircle(rx, ry, 36);
     });
 
-    // Scattered ruins (broken pillars with rune glow)
-    const ruins = this.add.graphics().setDepth(-1);
+    // === BIOME BORDER: Midgard → Jötunheim (800) ===
+    decoG.lineStyle(5, 0x11cc88, 0.55);
+    decoG.strokeCircle(cx, cy, 800);
+    decoG.lineStyle(2, 0x33ffbb, 0.22);
+    decoG.strokeCircle(cx, cy, 824);
+
+    // === JÖTUNHEIM: Ice crystal spires ===
     [
-      [cx-180, cy-220],[cx+200, cy-180],[cx-220, cy+190],[cx+180, cy+220],
-      [cx+480, cy-60],[cx-500, cy+80],[cx+60, cy-480],[cx-80, cy+500],
-      [cx+340, cy+340],[cx-360, cy-360],[cx+360, cy-360],[cx-340, cy+340],
+      [cx - 920, cy - 210], [cx + 880, cy + 250],
+      [cx + 115, cy - 960], [cx - 130, cy + 900],
+      [cx - 700, cy + 660], [cx + 715, cy - 680],
+      [cx + 820, cy + 210], [cx - 770, cy - 230],
+      [cx + 310, cy + 870], [cx - 330, cy - 850],
+      [cx - 1050, cy + 350], [cx + 1060, cy - 330],
     ].forEach(([rx, ry]) => {
-      // Stone column base
-      ruins.fillStyle(0x1a1828, 1);
-      ruins.fillRect(rx-14, ry-14, 28, 28);
-      ruins.fillStyle(0x28263a, 1);
-      ruins.fillRect(rx-11, ry-11, 18, 18);
-      ruins.fillStyle(0x322e48, 1);
-      ruins.fillRect(rx-8, ry-8, 10, 10);
-      ruins.lineStyle(1, 0x5544aa, 0.5);
-      ruins.strokeRect(rx-14, ry-14, 28, 28);
-      // Purple rune glow pool around each ruin
-      ruins.fillStyle(0x4422cc, 0.12);
-      ruins.fillCircle(rx, ry, 24);
-      ruins.fillStyle(0x6644ff, 0.06);
-      ruins.fillCircle(rx, ry, 36);
+      const d = Math.hypot(rx - cx, ry - cy);
+      if (d < 810 || d > 1580) return;
+      // Main crystal spire
+      decoG.fillStyle(0x1e4a8a, 0.9);
+      decoG.fillTriangle(rx, ry - 26, rx - 11, ry + 6, rx + 11, ry + 6);
+      // Left shard
+      decoG.fillStyle(0x2860aa, 0.65);
+      decoG.fillTriangle(rx - 10, ry - 12, rx - 18, ry + 10, rx - 2, ry + 10);
+      // Right shard
+      decoG.fillStyle(0x3a78cc, 0.5);
+      decoG.fillTriangle(rx + 8, ry - 10, rx + 2, ry + 10, rx + 18, ry + 10);
+      // Frost glow
+      decoG.fillStyle(0x66aaff, 0.13);
+      decoG.fillCircle(rx, ry, 22);
+      decoG.fillStyle(0x88ccff, 0.06);
+      decoG.fillCircle(rx, ry, 36);
+    });
+    // Inner frost ring
+    decoG.lineStyle(2, 0x1a4888, 0.38);
+    decoG.strokeCircle(cx, cy, 1200);
+
+    // === BIOME BORDER: Jötunheim → Helheim (1600) ===
+    decoG.lineStyle(5, 0x991100, 0.6);
+    decoG.strokeCircle(cx, cy, 1600);
+    decoG.lineStyle(2, 0xdd2200, 0.25);
+    decoG.strokeCircle(cx, cy, 1628);
+
+    // === HELHEIM: Skull totems + ember pools ===
+    [
+      [cx - 1720, cy + 210], [cx + 1760, cy - 190],
+      [cx + 215,  cy - 1740],[cx - 195,  cy + 1710],
+      [cx - 1320, cy - 1120],[cx + 1340, cy + 1140],
+      [cx + 1220, cy - 1310],[cx - 1260, cy + 1270],
+      [cx + 1640, cy + 620], [cx - 1660, cy - 600],
+      [cx - 800,  cy + 1580],[cx + 820,  cy - 1560],
+    ].forEach(([rx, ry]) => {
+      const d = Math.hypot(rx - cx, ry - cy);
+      if (d < 1615 || d > 2060) return;
+      // Totem pole
+      decoG.fillStyle(0x1e1610, 1);
+      decoG.fillRect(rx - 7, ry - 6, 14, 28);
+      // Skull
+      decoG.fillStyle(0x3a3028, 1);
+      decoG.fillEllipse(rx, ry - 18, 22, 20, 8);
+      decoG.lineStyle(1, 0xcc2200, 0.45);
+      decoG.strokeEllipse(rx, ry - 18, 22, 20, 8);
+      // Eye sockets
+      decoG.fillStyle(0xcc2200, 0.35);
+      decoG.fillCircle(rx - 5, ry - 20, 3);
+      decoG.fillCircle(rx + 5, ry - 20, 3);
+      // Ember pool beneath
+      decoG.fillStyle(0xcc2200, 0.14);
+      decoG.fillCircle(rx, ry + 6, 20);
+      decoG.fillStyle(0xff4400, 0.07);
+      decoG.fillCircle(rx, ry + 6, 34);
+    });
+    // Large atmospheric ember pools
+    [
+      [cx - 1820, cy - 410, 75], [cx + 1840, cy + 390, 60],
+      [cx + 510,  cy + 1780, 68],[cx - 490,  cy - 1800, 72],
+      [cx + 1450, cy - 820,  55],[cx - 1470, cy + 840,  58],
+    ].forEach(([ex, ey, er]) => {
+      const d = Math.hypot(ex - cx, ey - cy);
+      if (d < 1600 || d > 2100) return;
+      decoG.fillStyle(0xbb3300, 0.11);
+      decoG.fillCircle(ex, ey, er);
+      decoG.fillStyle(0xff5500, 0.05);
+      decoG.fillCircle(ex, ey, er * 1.55);
     });
   }
 
