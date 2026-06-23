@@ -13,6 +13,7 @@
 import { COLORS, CSS_COLORS } from '../data/design-system.js';
 import Skaldenlied from '../systems/Skaldenlied.js';
 import { DEFAULT_VERSES } from '../data/verses.js';
+import { SKALDS, DEFAULT_SKALD } from '../data/skalds.js';
 import {
   hitPause, FEEL, shakeNormal, shakeHeavy, squashStretch,
   damagePopup, hitBurst, slowMo, critPunch,
@@ -25,8 +26,11 @@ import {
 } from '../utils/SkaldenliedArt.js';
 import { audio } from '../audio/AudioBus.js';
 
-const ROOM_W = 1600;
-const ROOM_H = 900;
+const ROOM_W = 8000;
+const ROOM_H = 8000;
+const CENTER_X = ROOM_W / 2;
+const CENTER_Y = ROOM_H / 2;
+const HIGGSFIELD_SIZE = 1800; // Higgsfield bg covers the central spawn area
 
 export default class SkaldenliedScene extends Phaser.Scene {
   constructor() { super('SkaldenliedScene'); }
@@ -98,76 +102,110 @@ export default class SkaldenliedScene extends Phaser.Scene {
   }
 
   _drawRoom() {
-    // Base black under-layer
-    const black = this.add.graphics().setDepth(-2);
-    black.fillStyle(0x06000F, 1).fillRect(0, 0, ROOM_W, ROOM_H);
-
-    // Higgsfield-painted Wurzelkammer background
-    if (this.textures.exists('wurzelkammer_bg')) {
-      this.add.image(ROOM_W / 2, ROOM_H / 2, 'wurzelkammer_bg')
-        .setDisplaySize(ROOM_W, ROOM_H)
-        .setDepth(-1);
-    } else {
-      // Procedural fallback
-      const g = this.add.graphics().setDepth(0);
-      drawWurzelkammerFloor(g, ROOM_W, ROOM_H);
-    }
-
-    // Subtle rune overlay on top of background — pulses with the rhythm
-    const runeOverlay = this.add.graphics().setDepth(2);
-    runeOverlay.lineStyle(1, 0xC9A961, 0.18);
-    const runes = [
-      [[-8, -10], [8, -10], [-8, 10], [8, 10]],
-      [[0, -10], [-8, 10], [8, 10]],
-      [[-6, -10], [-6, 10], [6, -10], [-6, 0]],
-    ];
-    for (let i = 0; i < 6; i++) {
-      const rx = 140 + Math.random() * (ROOM_W - 280);
-      const ry = 140 + Math.random() * (ROOM_H - 280);
-      const rune = runes[Math.floor(Math.random() * runes.length)];
-      runeOverlay.beginPath();
-      runeOverlay.moveTo(rx + rune[0][0], ry + rune[0][1]);
-      for (let p = 1; p < rune.length; p++) {
-        runeOverlay.lineTo(rx + rune[p][0], ry + rune[p][1]);
+    // Procedural tile-able floor pattern covers the WHOLE 8000×8000 world
+    const floor = this.add.graphics().setDepth(-2);
+    const TILE = 256;
+    for (let tx = 0; tx < ROOM_W; tx += TILE) {
+      for (let ty = 0; ty < ROOM_H; ty += TILE) {
+        // Outer void color
+        floor.fillStyle(0x0A0612, 1).fillRect(tx, ty, TILE, TILE);
+        // Subtle vein cracks
+        if ((tx + ty) % (TILE * 2) === 0) {
+          floor.lineStyle(1, 0x2A1C36, 0.5);
+          floor.beginPath();
+          floor.moveTo(tx, ty + TILE / 2);
+          floor.lineTo(tx + TILE / 3, ty + TILE / 2 + 20);
+          floor.lineTo(tx + TILE, ty + TILE / 2 - 18);
+          floor.strokePath();
+        }
+        // Sparse rune carving — very rare
+        if (Math.random() < 0.02) {
+          floor.lineStyle(1, 0xC9A961, 0.25);
+          const rx = tx + 30 + Math.random() * (TILE - 60);
+          const ry = ty + 30 + Math.random() * (TILE - 60);
+          floor.beginPath();
+          floor.moveTo(rx - 8, ry - 8);
+          floor.lineTo(rx + 8, ry + 8);
+          floor.moveTo(rx + 8, ry - 8);
+          floor.lineTo(rx - 8, ry + 8);
+          floor.strokePath();
+        }
       }
-      runeOverlay.strokePath();
     }
-    this.tweens.add({
-      targets: runeOverlay,
-      alpha: { from: 0.6, to: 1 },
-      duration: 2400,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
 
-    // Atmosphere: drifting mist particles on top of background
+    // Higgsfield Wurzelkammer ONLY at the center — as the sacred spawn area
+    if (this.textures.exists('wurzelkammer_bg')) {
+      this.add.image(CENTER_X, CENTER_Y, 'wurzelkammer_bg')
+        .setDisplaySize(HIGGSFIELD_SIZE, HIGGSFIELD_SIZE * 9 / 16)
+        .setDepth(-1);
+    }
+
+    // Soft transition: dark radial fade outside the Higgsfield area
+    const fade = this.add.graphics().setDepth(0);
+    const fadeRadius = HIGGSFIELD_SIZE / 1.4;
+    for (let r = fadeRadius * 1.8; r > fadeRadius; r -= 30) {
+      const t = (r - fadeRadius) / (fadeRadius * 0.8);
+      fade.fillStyle(0x06000F, t * 0.08).fillCircle(CENTER_X, CENTER_Y, r);
+    }
+
+    // Distant Yggdrasil-root pillars scattered through the world
+    const pillars = this.add.graphics().setDepth(-1.5);
+    for (let i = 0; i < 24; i++) {
+      const px = Math.random() * ROOM_W;
+      const py = Math.random() * ROOM_H;
+      // Skip pillars too close to the Higgsfield center
+      const dx = px - CENTER_X, dy = py - CENTER_Y;
+      if (dx * dx + dy * dy < HIGGSFIELD_SIZE * HIGGSFIELD_SIZE / 4) continue;
+      const pSize = 40 + Math.random() * 30;
+      // Pillar silhouette
+      pillars.fillStyle(0x0E0A18, 0.95).fillCircle(px, py, pSize);
+      pillars.fillStyle(0x1A1422, 0.8).fillCircle(px, py - pSize / 3, pSize * 0.8);
+      pillars.lineStyle(1.5, 0x3a2040, 0.7).strokeCircle(px, py, pSize);
+      // Gold rune mark on some
+      if (Math.random() < 0.3) {
+        pillars.fillStyle(0xFFB45A, 0.55).fillCircle(px, py - pSize / 4, 4);
+      }
+    }
+
+    // Atmosphere: mist only near the center where it's "lit"
     spawnMist(this, ROOM_W, ROOM_H, 5);
 
-    // Volumetric god-rays through Yggdrasil roots from above
-    spawnLightShaft(this, ROOM_W * 0.45, 0, ROOM_H, 140, 4);
-    spawnLightShaft(this, ROOM_W * 0.7,  0, ROOM_H, 100, 4);
+    // Volumetric god-rays only at center
+    spawnLightShaft(this, CENTER_X - 200, CENTER_Y - HIGGSFIELD_SIZE / 2,
+                    HIGGSFIELD_SIZE * 9 / 16, 140, 4);
+    spawnLightShaft(this, CENTER_X + 280, CENTER_Y - HIGGSFIELD_SIZE / 2,
+                    HIGGSFIELD_SIZE * 9 / 16, 100, 4);
 
-    // Heavy vignette pins to camera
+    // Vignette is camera-pinned
     drawVignette(this, this.scale.width, this.scale.height, 60);
-
-    this._spawnCorners = [
-      { x: 220, y: 200 },
-      { x: ROOM_W - 220, y: 200 },
-      { x: ROOM_W / 2, y: ROOM_H - 180 },
-    ];
   }
 
   _createPlayer() {
-    const cx = ROOM_W / 2, cy = ROOM_H / 2;
-    const key = createSkaldTexture(this);
+    const cx = CENTER_X, cy = CENTER_Y;
+    const selectedId = this.registry.get('selectedSkald') || DEFAULT_SKALD;
+    const skald = SKALDS[selectedId] || SKALDS[DEFAULT_SKALD];
+    this._skaldProfile = skald;
+
+    let key, useHiggsfield = false;
+    if (this.textures.exists(skald.portrait)) {
+      key = skald.portrait;
+      useHiggsfield = true;
+    } else {
+      key = createSkaldTexture(this);
+    }
 
     this.player = this.physics.add.sprite(cx, cy, key);
-    this.player.setCircle(18, 30, 36);
+    if (useHiggsfield) {
+      this.player.setScale(skald.spriteScale);
+      this.player.setCircle(skald.bodyRadius, skald.bodyOffsetX, skald.bodyOffsetY);
+    } else {
+      this.player.setCircle(18, 30, 36);
+    }
     this.player.setCollideWorldBounds(true);
-    this.player.maxHp = 100;
-    this.player.hp = 100;
-    this.player.speed = 220;
+    this.player.maxHp = skald.stats.hp;
+    this.player.hp = skald.stats.hp;
+    this.player.dmgMult = skald.stats.dmg;
+    this.player.speed = skald.stats.spd;
     this.player.setDepth(20);
 
     // Soft golden glow under the skald — anchored, pulses
@@ -649,20 +687,66 @@ export default class SkaldenliedScene extends Phaser.Scene {
       this._spawnDraugrKing();
       return;
     }
-    const corner = Phaser.Math.RND.pick(this._spawnCorners);
-    const offset = 40;
-    const ox = corner.x + (Math.random() - 0.5) * offset;
-    const oy = corner.y + (Math.random() - 0.5) * offset;
+    // VS-style ring spawn: random angle around the player at ~700px (just off-screen)
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 700 + Math.random() * 200;
+    const px = this.player ? this.player.x : CENTER_X;
+    const py = this.player ? this.player.y : CENTER_Y;
+    const ox = Phaser.Math.Clamp(px + Math.cos(angle) * dist, 100, ROOM_W - 100);
+    const oy = Phaser.Math.Clamp(py + Math.sin(angle) * dist, 100, ROOM_H - 100);
 
-    // Wave 3+: 30% chance for warrior; wave 5+: 50%
-    const warriorChance = this._waveIndex >= 5 ? 0.5 : this._waveIndex >= 3 ? 0.3 : 0;
-    if (Math.random() < warriorChance) {
+    // Spawn variety scales with wave
+    // wave 1-2: basic draugr only
+    // wave 3+: skinwalker variant
+    // wave 4+: fenrir wolf (fast)
+    // wave 5+: warrior (tanky)
+    const roll = Math.random();
+    let kind = 'draugr';
+    if (this._waveIndex >= 5 && roll < 0.25) kind = 'warrior';
+    else if (this._waveIndex >= 4 && roll < 0.35) kind = 'fenrir';
+    else if (this._waveIndex >= 3 && roll < 0.45) kind = 'skinwalker';
+
+    const waveScale = 1 + (this._waveIndex - 1) * 0.15;
+
+    if (kind === 'fenrir' && this.textures.exists('enemy_fenrir')) {
+      const e = this.physics.add.sprite(ox, oy, 'enemy_fenrir');
+      e.setScale(0.08);
+      e.setCircle(220, 320, 380);
+      e.hp = Math.round(36 * waveScale);
+      e.maxHp = e.hp;
+      e.damage = Math.round(12 * waveScale);
+      e.speed = 140 + Math.random() * 40;
+      e.speedMult = 1;
+      e.setDepth(18);
+      e.lastTouchAt = 0;
+      e.kind = 'fenrir';
+      this.enemies.add(e);
+      return;
+    }
+
+    if (kind === 'skinwalker' && this.textures.exists('enemy_skinwalker')) {
+      const e = this.physics.add.sprite(ox, oy, 'enemy_skinwalker');
+      e.setScale(0.075);
+      e.setCircle(280, 300, 380);
+      e.hp = Math.round(50 * waveScale);
+      e.maxHp = e.hp;
+      e.damage = Math.round(14 * waveScale);
+      e.speed = 110 + Math.random() * 30;
+      e.speedMult = 1;
+      e.setDepth(18);
+      e.lastTouchAt = 0;
+      e.kind = 'skinwalker';
+      this.enemies.add(e);
+      return;
+    }
+
+    if (kind === 'warrior') {
       const key = createDraugrWarriorTexture(this);
       const e = this.physics.add.sprite(ox, oy, key);
       e.setCircle(16, 32, 30);
-      e.hp = 64;
-      e.maxHp = 64;
-      e.damage = 16;
+      e.hp = Math.round(64 * waveScale);
+      e.maxHp = e.hp;
+      e.damage = Math.round(16 * waveScale);
       e.speed = 55 + Math.random() * 20;
       e.speedMult = 1;
       e.setDepth(18);
@@ -675,7 +759,6 @@ export default class SkaldenliedScene extends Phaser.Scene {
     const key = createDraugrTexture(this);
     const e = this.physics.add.sprite(ox, oy, key);
     e.setCircle(14, 26, 22);
-    const waveScale = 1 + (this._waveIndex - 1) * 0.15;
     e.hp = Math.round(28 * waveScale);
     e.maxHp = e.hp;
     e.damage = Math.round(8 * waveScale);
@@ -695,8 +778,11 @@ export default class SkaldenliedScene extends Phaser.Scene {
 
     // Use the Higgsfield-painted king if loaded, fallback procedural
     const key = this.textures.exists('draugr_king_img') ? 'draugr_king_img' : createDraugrKingTexture(this);
-    const ox = ROOM_W / 2;
-    const oy = 200;
+    // Spawn the king directly in front of the player, far enough that he walks in
+    const px = this.player ? this.player.x : CENTER_X;
+    const py = this.player ? this.player.y : CENTER_Y;
+    const ox = px;
+    const oy = py - 600;
     const e = this.physics.add.sprite(ox, oy, key);
     if (key === 'draugr_king_img') {
       e.setScale(0.18);

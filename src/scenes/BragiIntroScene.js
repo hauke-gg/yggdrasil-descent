@@ -142,12 +142,12 @@ export default class BragiIntroScene extends Phaser.Scene {
   _goToSkaldenlied() {
     if (this._proceeding) return;
     this._proceeding = true;
-    // Quick fade out
+    // Quick fade out → skald select
     const W = this.scale.width, H = this.scale.height;
     const out = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0).setDepth(300);
     this.tweens.add({
       targets: out, fillAlpha: 1, duration: 700,
-      onComplete: () => this.scene.start('SkaldenliedScene'),
+      onComplete: () => this.scene.start('SkaldSelectScene'),
     });
   }
 
