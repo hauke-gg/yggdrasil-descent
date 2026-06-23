@@ -50,7 +50,8 @@ export default class WeaponSystem {
       if (passive.effect.rangeMultiplier) range = Math.round(range * passive.effect.rangeMultiplier);
     }
 
-    return { ...stats, cooldown, range };
+    const dmgMult = this.player.dmgMultiplier || 1;
+    return { ...stats, cooldown, range, damage: Math.round(stats.damage * dmgMult) };
   }
 
   _getNearestEnemy() {

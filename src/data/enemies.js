@@ -6,7 +6,7 @@ export const ENEMIES = {
     hp: 40,
     speed: 90,
     damage: 8,
-    xpReward: 5,
+    xpReward: 15,
     scale: 1.0
   },
   jotunn: {
@@ -26,7 +26,7 @@ export const ENEMIES = {
     hp: 25,
     speed: 130,
     damage: 6,
-    xpReward: 3,
+    xpReward: 8,
     scale: 0.8
   }
 };

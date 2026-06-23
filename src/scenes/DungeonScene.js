@@ -28,6 +28,7 @@ export default class DungeonScene extends Phaser.Scene {
     this._waveLevel = 0;
     this._spawnInterval = 3000;
     this._nextSpawnTime = 0;
+    this._spawnGrace = true;
     this._levelUpPending = false;
     this._lastMiniBossTime = 0;
 
@@ -35,6 +36,7 @@ export default class DungeonScene extends Phaser.Scene {
 
     this._drawWorld();
     this._createPlayer();
+    this._applyClassStats();
     this._createSystems();
     this._setupPhysics();
     this._setupCamera();
@@ -63,6 +65,19 @@ export default class DungeonScene extends Phaser.Scene {
   _createPlayer() {
     this._player = new Player(this, 2000, 2000);
     this._player.setCollideWorldBounds(true);
+  }
+
+  _applyClassStats() {
+    const classHp = { krieger: 120, schatten: 80, magier: 70 };
+    const hp = classHp[this._playerClass] || 100;
+    this._player.maxHp = hp;
+    this._player.hp = hp;
+    if (this._playerClass === 'krieger') this._player.dmgMultiplier = 1.2;
+    if (this._playerClass === 'schatten') this._player.speed = 234;
+    if (this._playerClass === 'magier') {
+      this._player.dmgMultiplier = 1.5;
+      this._player.speed = 162;
+    }
   }
 
   _createSystems() {
@@ -139,14 +154,17 @@ export default class DungeonScene extends Phaser.Scene {
   }
 
   _spawnInitialEnemies() {
-    for (let i = 0; i < 3; i++) {
-      const angle = (i / 3) * Math.PI * 2;
-      const x = 2000 + Math.cos(angle) * 180;
-      const y = 2000 + Math.sin(angle) * 180;
+    // Single Draugr far enough to give player 2s to orient
+    this.time.delayedCall(2000, () => {
+      const angle = Math.random() * Math.PI * 2;
+      const x = 2000 + Math.cos(angle) * 420;
+      const y = 2000 + Math.sin(angle) * 420;
       const stats = this._waveSystem.getEnemyStats('draugr', 1);
       const enemy = new Draugr(this, x, y, stats);
       this._enemies.add(enemy);
-    }
+      // Lift grace period so wave spawning begins
+      this._spawnGrace = false;
+    });
   }
 
   _getSpawnPoint() {
@@ -220,7 +238,7 @@ export default class DungeonScene extends Phaser.Scene {
 
     this._hud.update(this._player, this._survivalSeconds, this._getBiomeName());
 
-    if (time > this._nextSpawnTime) {
+    if (!this._spawnGrace && time > this._nextSpawnTime) {
       this._spawnEnemy();
       this._nextSpawnTime = time + this._spawnInterval;
     }
