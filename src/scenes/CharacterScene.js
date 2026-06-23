@@ -95,15 +95,17 @@ export default class CharacterScene extends Phaser.Scene {
       this.add.text(cardX, ry + 88, cls.epithet, TEXT_STYLES.caption)
         .setOrigin(0.5);
 
-      // Description
-      this.add.text(cardX, ry + 110, cls.desc,
-        { ...TEXT_STYLES.cardBody, wordWrap: { width: cardW - 24 }, align: 'center' })
-        .setOrigin(0.5, 0);
+      // Description — maxLines prevents overflow below card
+      this.add.text(cardX, ry + 108, cls.desc, {
+        fontFamily: "'Lora', serif", fontSize: '11px', color: '#cccac0',
+        wordWrap: { width: cardW - 28 }, align: 'center',
+        lineSpacing: 3, maxLines: 4
+      }).setOrigin(0.5, 0);
 
       // Stats
-      this.add.text(cardX, ry + cardH - 12, cls.stats,
-        { ...TEXT_STYLES.stat, fontSize: '10px' })
-        .setOrigin(0.5, 1);
+      this.add.text(cardX, ry + cardH - 10, cls.stats, {
+        fontFamily: "'Space Mono', monospace", fontSize: '10px', color: '#7799aa'
+      }).setOrigin(0.5, 1);
 
       // Hit area
       const hit = this.add.rectangle(cardX, cardCY, cardW, cardH, 0x000000, 0)
