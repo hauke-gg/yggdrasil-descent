@@ -67,6 +67,9 @@ export default class SkaldenliedScene extends Phaser.Scene {
 
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
 
+    // Show onboarding splash on first entry (or if skipped previously, still show)
+    this._showOnboarding();
+
     // Input
     this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,ONE,TWO,THREE,SPACE');
     this.input.keyboard.on('keydown-ESC', () => this._returnToMenu());
@@ -221,78 +224,57 @@ export default class SkaldenliedScene extends Phaser.Scene {
       stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
 
-    // Verse panel — bottom strip with Norse ornament
-    const panelH = 120;
-    const panelY = H - panelH;
-    const panel = this.add.graphics().setDepth(80).setScrollFactor(0);
-    // Layered panel background — darker at bottom
-    panel.fillStyle(0x000000, 0.85).fillRect(0, panelY, W, panelH);
-    panel.fillStyle(0x0A0612, 0.6).fillRect(0, panelY + panelH * 0.5, W, panelH * 0.5);
-    // Top border ornament
-    drawNorseOrnament(panel, 0, panelY, W, panelH);
+    // Compact action bar — 4 square buttons centered at the bottom
+    this._actionButtons = [];
+    const btnSize = 56;
+    const btnGap = 14;
+    const btnCount = 4;
+    const totalW = btnCount * btnSize + (btnCount - 1) * btnGap;
+    const startX = W / 2 - totalW / 2 + btnSize / 2;
+    const btnY = H - btnSize / 2 - 12;
 
-    this.add.text(W / 2, panelY + 16, '— DEIN LIED —', {
-      fontFamily: "'Cinzel', serif", fontSize: '12px',
-      color: CSS_COLORS.goldLight, fontStyle: 'bold', letterSpacing: 4,
-    }).setOrigin(0.5).setDepth(82).setScrollFactor(0);
+    // Subtle bar background — narrow strip
+    const bar = this.add.graphics().setDepth(80).setScrollFactor(0);
+    bar.fillStyle(0x000000, 0.4).fillRect(0, btnY - btnSize / 2 - 6, W, btnSize + 12);
+    bar.lineStyle(1, 0xC9A961, 0.25)
+      .lineBetween(0, btnY - btnSize / 2 - 6, W, btnY - btnSize / 2 - 6);
 
-    this._verseTexts = [];
-    this._castHints = [];
-    this._cooldownBars = [];
-    const verseGap = W / 3;
     DEFAULT_VERSES.forEach((v, i) => {
-      const cx = verseGap * i + verseGap / 2;
-      const stab = v.trigger.stab;
-      const stabColor = v.synergy ? CSS_COLORS.goldLight : CSS_COLORS.purpleLight;
-
-      // Vertical divider between verses
-      if (i > 0) {
-        const divX = verseGap * i;
-        const div = this.add.graphics().setDepth(81).setScrollFactor(0);
-        div.lineStyle(1, 0xC9A961, 0.25);
-        div.lineBetween(divX, panelY + 32, divX, panelY + panelH - 12);
-      }
-
-      // Keyboard hint badge
-      const keyBadge = this.add.graphics().setDepth(82).setScrollFactor(0);
-      keyBadge.fillStyle(0x0E0A18, 0.9).fillRoundedRect(cx - 110, panelY + 36, 22, 22, 3);
-      keyBadge.lineStyle(1, 0xC9A961, 0.7).strokeRoundedRect(cx - 110, panelY + 36, 22, 22, 3);
-      const keyText = this.add.text(cx - 99, panelY + 47, String(i + 1), {
-        fontFamily: "'Cinzel', serif", fontSize: '12px',
-        color: CSS_COLORS.goldLight, fontStyle: 'bold',
-      }).setOrigin(0.5).setDepth(83).setScrollFactor(0);
-
-      // Stab-letter badge — large alliteration letter
-      const badge = this.add.text(cx - 70, panelY + 50, stab, {
-        fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '30px',
-        color: stabColor, fontStyle: 'bold',
-        stroke: '#000', strokeThickness: 3,
-      }).setOrigin(0.5).setDepth(82).setScrollFactor(0).setAlpha(0.55);
-
-      const t = this.add.text(cx + 20, panelY + 38, v.text, {
-        fontFamily: "'Lora', serif", fontSize: '12px',
-        color: '#e8dcc0', align: 'left', wordWrap: { width: verseGap - 110 },
-        lineSpacing: 2,
-      }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
-
-      const sub = this.add.text(cx + 20, panelY + 86, v.trigger.desc, {
-        fontFamily: "'Space Mono', monospace", fontSize: '9px',
-        color: '#7a7080', align: 'left', wordWrap: { width: verseGap - 110 },
-      }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
-
-      // Cooldown bar (horizontal under the verse)
-      const cdBar = this.add.graphics().setDepth(82).setScrollFactor(0);
-      this._cooldownBars.push({ gfx: cdBar, cx, panelY, panelH, color: stabColor });
-
-      this._verseTexts.push({ text: t, sub, badge, keyText, keyBadge });
+      const cx = startX + i * (btnSize + btnGap);
+      const stabColor = v.synergy ? 0xFFD66B : 0xcc88ff;
+      this._actionButtons.push(
+        this._createActionButton(cx, btnY, btnSize, {
+          slot: i,
+          keyLabel: String(i + 1),
+          glyph: v.trigger.stab,
+          glyphColor: stabColor,
+          subLabel: this._verbShort(v.verb.id),
+          tooltipText: v.text,
+        })
+      );
     });
 
-    // SPACE hint bottom-center on top of panel border
-    this._swirlHint = this.add.graphics().setDepth(82).setScrollFactor(0);
-    this._swirlHintText = this.add.text(W / 2, panelY - 22, '[SPACE] Skalden-Wirbel', {
-      fontFamily: "'Space Mono', monospace", fontSize: '10px',
-      color: '#8a7080', letterSpacing: 1,
-    }).setOrigin(0.5).setDepth(82).setScrollFactor(0);
+    // 4th button — Skalden-Wirbel (SPACE)
+    const swirlX = startX + 3 * (btnSize + btnGap);
+    this._swirlButton = this._createActionButton(swirlX, btnY, btnSize, {
+      slot: -1,
+      keyLabel: '⎵',
+      glyph: '✦',
+      glyphColor: 0xFFB45A,
+      subLabel: 'Wirbel',
+      tooltipText: 'Skalden-Wirbel — 360° AoE-Stoß',
+    });
+
+    // Verse pop-up text holder — shows full stab-rhyme when a verse fires
+    this._versePopupText = this.add.text(W / 2, H * 0.34, '', {
+      fontFamily: "'Cinzel', serif", fontSize: '20px',
+      color: '#e8dcc0', align: 'center', wordWrap: { width: W * 0.7 },
+      stroke: '#000', strokeThickness: 3, fontStyle: 'italic',
+    }).setOrigin(0.5).setDepth(140).setScrollFactor(0).setAlpha(0);
+
+    // For backward compatibility (cooldown / flash methods reference these)
+    this._verseTexts = [];
+    this._cooldownBars = [];
 
     // ESC hint
     this.add.text(W - 12, H - 8, 'ESC = Menü', {
@@ -300,39 +282,115 @@ export default class SkaldenliedScene extends Phaser.Scene {
     }).setOrigin(1, 1).setDepth(83).setScrollFactor(0);
   }
 
+  _verbShort(verbId) {
+    return ({
+      burst: 'Burst', bind: 'Heilung', freeze: 'Frost',
+      strike: 'Speer', nova: 'Nova',
+    })[verbId] || verbId;
+  }
+
+  _createActionButton(cx, cy, size, opts) {
+    const r = size / 2;
+    const hex = opts.glyphColor;
+    const colorCss = '#' + hex.toString(16).padStart(6, '0');
+    const dimCss = '#' + this._dimHex(hex, 0.5).toString(16).padStart(6, '0');
+
+    // Background frame
+    const bg = this.add.graphics().setDepth(81).setScrollFactor(0);
+    const cdOverlay = this.add.graphics().setDepth(83).setScrollFactor(0);
+
+    const draw = (ready) => {
+      bg.clear();
+      bg.fillStyle(0x0E0A18, 0.92).fillRoundedRect(cx - r, cy - r, size, size, 8);
+      bg.lineStyle(2, ready ? hex : 0x4a3a5e, ready ? 0.95 : 0.65)
+        .strokeRoundedRect(cx - r, cy - r, size, size, 8);
+    };
+    draw(true);
+
+    // Glyph in center
+    const glyph = this.add.text(cx, cy, opts.glyph, {
+      fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '30px',
+      color: colorCss, fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(82).setScrollFactor(0);
+
+    // Key badge (top-left)
+    const keyBg = this.add.graphics().setDepth(82).setScrollFactor(0);
+    keyBg.fillStyle(0x000000, 0.85).fillRoundedRect(cx - r - 4, cy - r - 4, 18, 18, 3);
+    keyBg.lineStyle(1, 0xC9A961, 0.8).strokeRoundedRect(cx - r - 4, cy - r - 4, 18, 18, 3);
+    const keyText = this.add.text(cx - r + 5, cy - r + 5, opts.keyLabel, {
+      fontFamily: "'Cinzel', serif", fontSize: '11px',
+      color: '#FFD66B', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(83).setScrollFactor(0);
+
+    // Sub label below
+    const sub = this.add.text(cx, cy + r + 9, opts.subLabel, {
+      fontFamily: "'Space Mono', monospace", fontSize: '9px',
+      color: dimCss, letterSpacing: 1,
+    }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
+
+    return {
+      slot: opts.slot,
+      cx, cy, size, r, hex,
+      bg, glyph, keyBg, keyText, sub, cdOverlay,
+      draw,
+      tooltipText: opts.tooltipText,
+    };
+  }
+
+  _dimHex(hex, factor) {
+    const r = ((hex >> 16) & 255) * factor;
+    const g = ((hex >> 8) & 255) * factor;
+    const b = (hex & 255) * factor;
+    return (Math.floor(r) << 16) | (Math.floor(g) << 8) | Math.floor(b);
+  }
+
   _flashVerse(verse, active = false) {
     const idx = DEFAULT_VERSES.indexOf(verse);
-    if (idx < 0 || !this._verseTexts[idx]) return;
-    const entry = this._verseTexts[idx];
-    const t = entry.text;
-    const badge = entry.badge;
-    const color = active ? '#FFD66B' : (verse.synergy ? '#FFD66B' : '#cc88ff');
-    t.setColor(color);
-    if (badge) {
-      badge.setAlpha(1);
-      this.tweens.add({
-        targets: badge,
-        scale: { from: 1.0, to: active ? 1.6 : 1.3 },
-        duration: 180,
-        yoyo: true,
-        onComplete: () => { badge.setScale(1); badge.setAlpha(0.55); },
-      });
-    }
-    if (active && entry.keyBadge) {
-      this.tweens.add({
-        targets: entry.keyText,
-        scale: { from: 1.0, to: 1.5 },
-        duration: 140,
-        yoyo: true,
-        onComplete: () => entry.keyText.setScale(1),
-      });
-    }
+    if (idx < 0 || !this._actionButtons[idx]) return;
+    const btn = this._actionButtons[idx];
+    const flashColor = active ? 0xFFD66B : btn.hex;
+
+    // Pulse the button
     this.tweens.add({
-      targets: t,
-      scale: { from: 1.0, to: active ? 1.18 : 1.12 },
-      duration: 140,
-      yoyo: true,
-      onComplete: () => t.setColor('#e8dcc0'),
+      targets: btn.glyph,
+      scale: { from: 1.0, to: active ? 1.6 : 1.4 },
+      duration: 180, yoyo: true,
+      onComplete: () => btn.glyph.setScale(1),
+    });
+    btn.bg.clear();
+    btn.bg.fillStyle(this._dimHex(flashColor, 0.3), 0.95)
+      .fillRoundedRect(btn.cx - btn.r, btn.cy - btn.r, btn.size, btn.size, 8);
+    btn.bg.lineStyle(3, flashColor, 1)
+      .strokeRoundedRect(btn.cx - btn.r, btn.cy - btn.r, btn.size, btn.size, 8);
+    this.time.delayedCall(220, () => btn.draw(true));
+
+    // Show verse-text pop-up
+    this._showVersePopup(verse.text, active);
+  }
+
+  _showVersePopup(text, active) {
+    if (!this._versePopupText) return;
+    if (this._versePopupTween) this._versePopupTween.stop();
+    this._versePopupText.setText(text);
+    this._versePopupText.setColor(active ? '#FFD66B' : '#e8dcc0');
+    this._versePopupText.setAlpha(0);
+    this._versePopupText.setScale(0.7);
+    this._versePopupTween = this.tweens.add({
+      targets: this._versePopupText,
+      alpha: { from: 0, to: 1 },
+      scale: { from: 0.7, to: 1.05 },
+      duration: 220, ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: this._versePopupText,
+          alpha: 0, y: this._versePopupText.y - 30,
+          duration: 800, delay: 800, ease: 'Cubic.easeIn',
+          onComplete: () => {
+            this._versePopupText.y = this.scale.height * 0.34;
+          },
+        });
+      },
     });
   }
 
@@ -449,34 +507,102 @@ export default class SkaldenliedScene extends Phaser.Scene {
   }
 
   _updateCooldownBars() {
-    if (!this._cooldownBars || !this.skaldenlied) return;
-    this._cooldownBars.forEach((bar, i) => {
+    if (!this._actionButtons || !this.skaldenlied) return;
+    // Draw a darkening overlay sliding away from the bottom as the cooldown clears
+    this._actionButtons.forEach((btn, i) => {
       const p = this.skaldenlied.getActiveCooldownProgress(i);
-      bar.gfx.clear();
-      const barW = 100;
-      const barX = bar.cx - barW / 2;
-      const barY = bar.panelY + bar.panelH - 12;
-      // Background
-      bar.gfx.fillStyle(0x1A1422, 0.85).fillRect(barX, barY, barW, 3);
-      // Fill
-      if (p >= 1) {
-        bar.gfx.fillStyle(0xFFD66B, 1).fillRect(barX, barY, barW, 3);
-        // Pulse glow when ready
-        const pulse = 0.5 + Math.sin(this.time.now * 0.005) * 0.3;
-        bar.gfx.fillStyle(0xFFD66B, pulse * 0.4).fillRect(barX - 1, barY - 1, barW + 2, 5);
+      btn.cdOverlay.clear();
+      if (p < 1) {
+        const fillH = btn.size * (1 - p);
+        btn.cdOverlay
+          .fillStyle(0x000000, 0.65)
+          .fillRect(btn.cx - btn.r, btn.cy - btn.r, btn.size, fillH);
       } else {
-        bar.gfx.fillStyle(0x9966ee, 0.7).fillRect(barX, barY, barW * p, 3);
+        // Subtle pulse halo when ready
+        const pulse = 0.5 + Math.sin(this.time.now * 0.005) * 0.5;
+        btn.cdOverlay
+          .lineStyle(2, btn.hex, pulse * 0.35)
+          .strokeRoundedRect(btn.cx - btn.r - 2, btn.cy - btn.r - 2, btn.size + 4, btn.size + 4, 9);
       }
     });
 
-    // Swirl hint color
-    if (this._swirlHintText && this.skaldenlied) {
-      if (this.skaldenlied.canSwirl()) {
-        this._swirlHintText.setColor('#FFD66B');
+    // Swirl button cooldown
+    if (this._swirlButton && this.skaldenlied) {
+      const p = this.skaldenlied.swirlCooldownProgress();
+      const btn = this._swirlButton;
+      btn.cdOverlay.clear();
+      if (p < 1) {
+        const fillH = btn.size * (1 - p);
+        btn.cdOverlay
+          .fillStyle(0x000000, 0.65)
+          .fillRect(btn.cx - btn.r, btn.cy - btn.r, btn.size, fillH);
       } else {
-        this._swirlHintText.setColor('#5a4a6a');
+        const pulse = 0.5 + Math.sin(this.time.now * 0.005) * 0.5;
+        btn.cdOverlay
+          .lineStyle(2, btn.hex, pulse * 0.4)
+          .strokeRoundedRect(btn.cx - btn.r - 2, btn.cy - btn.r - 2, btn.size + 4, btn.size + 4, 9);
       }
     }
+  }
+
+  _showOnboarding() {
+    const W = this.scale.width, H = this.scale.height;
+    const ov = this.add.graphics().setDepth(180).setScrollFactor(0);
+    ov.fillStyle(0x000000, 0.55).fillRect(0, 0, W, H);
+
+    const title = this.add.text(W / 2, H * 0.30, 'BEFEHLE', {
+      fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '20px',
+      color: '#FFD66B', fontStyle: 'bold', letterSpacing: 6,
+      stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(181).setScrollFactor(0).setAlpha(0);
+
+    const moveHint = this.add.text(W / 2, H * 0.36, 'WASD / Pfeiltasten — bewegen', {
+      fontFamily: "'Cinzel', serif", fontSize: '14px',
+      color: '#e8dcc0', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(181).setScrollFactor(0).setAlpha(0);
+
+    const versHint = this.add.text(W / 2, H * 0.43,
+      '1 · 2 · 3   —   aktive Verse (Tasten gehören zu deinem Lied)', {
+      fontFamily: "'Cinzel', serif", fontSize: '14px',
+      color: '#cc88ff', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(181).setScrollFactor(0).setAlpha(0);
+
+    const swirlHint = this.add.text(W / 2, H * 0.49,
+      'Leertaste   —   Skalden-Wirbel (360° Stoß, 4 Sek Cooldown)', {
+      fontFamily: "'Cinzel', serif", fontSize: '14px',
+      color: '#FFB45A', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(181).setScrollFactor(0).setAlpha(0);
+
+    const goal = this.add.text(W / 2, H * 0.57,
+      'Sieben Wellen. Eine Krone fällt am Ende der fünften.', {
+      fontFamily: "'Lora', serif", fontSize: '13px', fontStyle: 'italic',
+      color: '#a89888', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(181).setScrollFactor(0).setAlpha(0);
+
+    const skip = this.add.text(W / 2, H * 0.64,
+      '(Beliebige Taste — beginnen)', {
+      fontFamily: "'Space Mono', monospace", fontSize: '10px',
+      color: '#7a7080',
+    }).setOrigin(0.5).setDepth(181).setScrollFactor(0).setAlpha(0);
+
+    this.tweens.add({ targets: title, alpha: 1, duration: 400 });
+    this.tweens.add({ targets: moveHint, alpha: 1, duration: 400, delay: 350 });
+    this.tweens.add({ targets: versHint, alpha: 1, duration: 400, delay: 700 });
+    this.tweens.add({ targets: swirlHint, alpha: 1, duration: 400, delay: 1050 });
+    this.tweens.add({ targets: goal, alpha: 1, duration: 400, delay: 1400 });
+    this.tweens.add({ targets: skip, alpha: 1, duration: 400, delay: 1800 });
+
+    const dismiss = () => {
+      if (this._onboardingDismissed) return;
+      this._onboardingDismissed = true;
+      [ov, title, moveHint, versHint, swirlHint, goal, skip].forEach(o => {
+        this.tweens.add({ targets: o, alpha: 0, duration: 400, onComplete: () => o.destroy() });
+      });
+      this.input.keyboard.off('keydown', dismiss);
+    };
+    // After 4.2s OR any keypress
+    this.time.delayedCall(4200, dismiss);
+    this.input.keyboard.on('keydown', dismiss);
   }
 
   update(time, delta) {
