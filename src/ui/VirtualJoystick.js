@@ -53,8 +53,8 @@ export default class VirtualJoystick {
   }
 
   _isInZone(x, y) {
-    // Left half, lower 55% of screen
-    return x < 340 && y > 260;
+    // Left half, lower 50% of screen — wider zone for easier activation
+    return x < 420 && y > 220;
   }
 
   _onDown(pointer) {

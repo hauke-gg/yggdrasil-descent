@@ -64,11 +64,11 @@ export default class CharacterScene extends Phaser.Scene {
     // --- Class cards ---
     const classKeys = ['krieger', 'schatten', 'magier'];
     const spriteKeys = { krieger: 'krieger', schatten: 'schatten', magier: 'magier' };
-    const cardW = 195, cardH = 250;
-    const gap = 22;
+    const cardW = 200, cardH = 278;
+    const gap = 20;
     const totalW = classKeys.length * cardW + (classKeys.length - 1) * gap;
     const startX = cx - totalW / 2 + cardW / 2;
-    const cardCY = H / 2 + 65;
+    const cardCY = H / 2 + 52;
 
     this._cardGraphics = [];
 
@@ -87,30 +87,54 @@ export default class CharacterScene extends Phaser.Scene {
       // Character sprite preview (actual game sprite)
       const spriteKey = spriteKeys[key];
       if (this.textures.exists(spriteKey)) {
-        this.add.image(cardX, ry + 48, spriteKey)
-          .setScale(1.1)
+        this.add.image(cardX, ry + 46, spriteKey)
+          .setScale(1.3)
           .setDepth(1);
       }
 
+      // Horizontal divider below sprite
+      const divGfx = this.add.graphics();
+      divGfx.lineStyle(1, 0x3a3060, 0.7);
+      divGfx.lineBetween(rx + 14, ry + 88, rx + cardW - 14, ry + 88);
+
       // Class name
-      this.add.text(cardX, ry + 102, cls.name, TEXT_STYLES.cardTitle)
+      this.add.text(cardX, ry + 102, cls.name, { ...TEXT_STYLES.cardTitle, fontSize: '13px' })
         .setOrigin(0.5);
 
       // Epithet
-      this.add.text(cardX, ry + 122, cls.epithet, TEXT_STYLES.caption)
+      this.add.text(cardX, ry + 122, cls.epithet, { ...TEXT_STYLES.caption, fontSize: '11px' })
         .setOrigin(0.5);
 
+      // Thin divider below epithet
+      const divGfx2 = this.add.graphics();
+      divGfx2.lineStyle(1, 0x2a2040, 0.5);
+      divGfx2.lineBetween(rx + 24, ry + 140, rx + cardW - 24, ry + 140);
+
       // Description
-      this.add.text(cardX, ry + 140, cls.desc, {
-        fontFamily: "'Lora', serif", fontSize: '11px', color: '#cccac0',
-        wordWrap: { width: cardW - 28 }, align: 'center',
-        lineSpacing: 3, maxLines: 4
+      this.add.text(cardX, ry + 150, cls.desc, {
+        fontFamily: "'Lora', serif", fontSize: '11px', color: '#b8b6ac',
+        wordWrap: { width: cardW - 24 }, align: 'center',
+        lineSpacing: 4, maxLines: 3
       }).setOrigin(0.5, 0);
 
-      // Stats
-      this.add.text(cardX, ry + cardH - 10, cls.stats, {
-        fontFamily: "'Space Mono', monospace", fontSize: '10px', color: '#7799aa'
-      }).setOrigin(0.5, 1);
+      // Stats background
+      const statsGfx = this.add.graphics();
+      statsGfx.fillStyle(0x0a0520, 0.9);
+      statsGfx.fillRoundedRect(rx + 10, ry + cardH - 60, cardW - 20, 50, 4);
+      statsGfx.lineStyle(1, 0x2a2040, 0.6);
+      statsGfx.strokeRoundedRect(rx + 10, ry + cardH - 60, cardW - 20, 50, 4);
+
+      // Stats — split into 3 lines
+      const [hpPart, dmgPart, spdPart] = cls.stats.split('  ·  ');
+      this.add.text(cardX, ry + cardH - 52, hpPart || cls.stats, {
+        fontFamily: "'Space Mono', monospace", fontSize: '10px', color: '#ff6666'
+      }).setOrigin(0.5, 0);
+      if (dmgPart) this.add.text(cardX, ry + cardH - 38, dmgPart, {
+        fontFamily: "'Space Mono', monospace", fontSize: '10px', color: '#ffaa44'
+      }).setOrigin(0.5, 0);
+      if (spdPart) this.add.text(cardX, ry + cardH - 24, spdPart, {
+        fontFamily: "'Space Mono', monospace", fontSize: '10px', color: '#44aaff'
+      }).setOrigin(0.5, 0);
 
       // Hit area
       const hit = this.add.rectangle(cardX, cardCY, cardW, cardH, 0x000000, 0)

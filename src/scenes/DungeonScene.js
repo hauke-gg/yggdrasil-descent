@@ -408,6 +408,7 @@ export default class DungeonScene extends Phaser.Scene {
   _onLevelUp() {
     this._levelUpPending = true;
     const options = this._buildLevelUpOptions();
+    this.physics.pause();
     this._godSpeechUI.show(() => {
       this._levelUpUI.show(options, (choice) => {
         this._applyLevelUpChoice(choice);

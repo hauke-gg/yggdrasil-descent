@@ -64,24 +64,29 @@ export default class GodSpeechUI {
     // Outer glow ring
     portraitGfx.lineStyle(3, accentHex, 0.25);
     portraitGfx.strokeCircle(portraitCX, portraitCY, portraitR + 8);
-    // Portrait circle fill
+    // Background circle
     portraitGfx.fillStyle(godColors.fill, 1);
     portraitGfx.fillCircle(portraitCX, portraitCY, portraitR);
-    portraitGfx.lineStyle(2, accentHex, 0.85);
+    // Border ring
+    portraitGfx.lineStyle(2, accentHex, 0.9);
     portraitGfx.strokeCircle(portraitCX, portraitCY, portraitR);
-    // Inner rune cross
-    portraitGfx.lineStyle(1, accentHex, 0.45);
-    portraitGfx.lineBetween(portraitCX - portraitR + 8, portraitCY, portraitCX + portraitR - 8, portraitCY);
-    portraitGfx.lineBetween(portraitCX, portraitCY - portraitR + 8, portraitCX, portraitCY + portraitR - 8);
     this._objects.push(portraitGfx);
 
-    // God initial letter
-    const portraitLetter = this.scene.add.text(portraitCX, portraitCY, godColors.symbol, {
-      fontFamily: "'Cinzel Decorative', serif",
-      fontSize: '36px', color: speech.color,
-      shadow: { blur: 12, color: speech.color, fill: true }
-    }).setOrigin(0.5).setDepth(93).setScrollFactor(0).setAlpha(0);
-    this._objects.push(portraitLetter);
+    // Portrait — pixel-art god sprite if available, letter fallback otherwise
+    const portraitKey = `portrait_${speech.speaker.toLowerCase()}`;
+    let portraitDisplay;
+    if (this.scene.textures.exists(portraitKey)) {
+      portraitDisplay = this.scene.add.image(portraitCX, portraitCY, portraitKey)
+        .setDepth(93).setScrollFactor(0).setAlpha(0)
+        .setScale(portraitR / 48);
+    } else {
+      portraitDisplay = this.scene.add.text(portraitCX, portraitCY, godColors.symbol, {
+        fontFamily: "'Cinzel Decorative', serif",
+        fontSize: '36px', color: speech.color,
+        shadow: { blur: 12, color: speech.color, fill: true }
+      }).setOrigin(0.5).setDepth(93).setScrollFactor(0).setAlpha(0);
+    }
+    this._objects.push(portraitDisplay);
 
     // Divider line between portrait and text
     const divX = panelX + 165;
@@ -165,7 +170,7 @@ export default class GodSpeechUI {
     rafFade(panelGfx,      0, 1, 280,  50);
     rafFade(portraitGfx,   0, 1, 280, 100);
     rafFade([divGfx, underGfx], 0, 1, 250, 150);
-    rafFade(portraitLetter, 0, 1, 300, 200);
+    rafFade(portraitDisplay, 0, 1, 300, 200);
     rafFade(nameT,          0, 1, 250, 250);
     rafFade(speechT,        0, 1, 400, 380);
     rafFade(choiceT,        0, 1, 300, 700);
