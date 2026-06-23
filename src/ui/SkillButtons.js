@@ -7,9 +7,9 @@ export default class SkillButtons {
     this._cooldown   = false;
     this._cooldownPct = 0;
 
-    // Button center
-    this._btnX = 862;
-    this._btnY = 452;
+    // Button center — anchored to bottom-right corner
+    this._btnX = scene.scale.width - 98;
+    this._btnY = scene.scale.height - 88;
     this._btnR = 38;
 
     this._gfx = scene.add.graphics().setDepth(50).setScrollFactor(0);

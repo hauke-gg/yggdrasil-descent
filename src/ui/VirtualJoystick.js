@@ -53,8 +53,10 @@ export default class VirtualJoystick {
   }
 
   _isInZone(x, y) {
-    // Left half, lower 50% of screen — wider zone for easier activation
-    return x < 420 && y > 220;
+    // Left 44% of screen, lower 42% — proportional to viewport size
+    const W = this.scene.scale.width;
+    const H = this.scene.scale.height;
+    return x < W * 0.44 && y > H * 0.42;
   }
 
   _onDown(pointer) {
