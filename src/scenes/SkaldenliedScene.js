@@ -17,6 +17,7 @@ import { SKALDS, DEFAULT_SKALD } from '../data/skalds.js';
 import { GODS, BOON_LIBRARY, rollBoonChoice } from '../data/boons.js';
 import { isMobile } from '../utils/MobileDetect.js';
 import VirtualJoystick from '../ui/VirtualJoystick.js';
+import { makeBlackTransparent } from '../utils/SpritePostprocess.js';
 import {
   hitPause, FEEL, shakeNormal, shakeHeavy, squashStretch,
   damagePopup, hitBurst, slowMo, critPunch,
@@ -191,7 +192,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
 
     let key, useHiggsfield = false;
     if (this.textures.exists(skald.portrait)) {
-      key = skald.portrait;
+      key = makeBlackTransparent(this, skald.portrait);
       useHiggsfield = true;
     } else {
       key = createSkaldTexture(this);
@@ -210,6 +211,18 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this.player.dmgMult = skald.stats.dmg;
     this.player.speed = skald.stats.spd;
     this.player.setDepth(20);
+    this._playerBaseScale = this.player.scaleX;
+    this._playerFacing = 1; // 1 = right, -1 = left
+
+    // Idle breath: subtle scaleY pulse
+    this.tweens.add({
+      targets: this.player,
+      scaleY: this.player.scaleY * 1.035,
+      duration: 1400,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
 
     // Soft golden glow under the skald — anchored, pulses
     this.playerGlow = this.add.circle(cx, cy, 42, 0xC9A961, 0.18).setDepth(15);
@@ -338,10 +351,15 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this._verseTexts = [];
     this._cooldownBars = [];
 
-    // ESC hint
-    this.add.text(W - 12, H - 8, 'ESC = Menü', {
-      fontFamily: "'Space Mono', monospace", fontSize: '9px', color: '#5a4a6a',
-    }).setOrigin(1, 1).setDepth(83).setScrollFactor(0);
+    // ESC / Back hint — top-right corner to avoid clash with action bar
+    const escLabel = isMobile(this) ? '✕ Menü' : 'ESC = Menü';
+    const escText = this.add.text(W - 12, 50, escLabel, {
+      fontFamily: "'Space Mono', monospace", fontSize: '10px', color: '#7a7080',
+    }).setOrigin(1, 0).setDepth(83).setScrollFactor(0);
+    if (isMobile(this)) {
+      escText.setInteractive({ useHandCursor: true });
+      escText.on('pointerdown', () => this._returnToMenu());
+    }
   }
 
   _verbShort(verbId) {
@@ -641,7 +659,8 @@ export default class SkaldenliedScene extends Phaser.Scene {
     // God portrait left
     let portrait = null;
     if (this.textures.exists(god.portrait)) {
-      portrait = this.add.image(W * 0.25, H * 0.5, god.portrait)
+      const cleanKey = makeBlackTransparent(this, god.portrait);
+      portrait = this.add.image(W * 0.25, H * 0.5, cleanKey)
         .setDisplaySize(H * 0.7, H * 0.7).setAlpha(0);
       layer.add(portrait);
       this.tweens.add({ targets: portrait, alpha: 1, duration: 900, delay: 200 });
@@ -859,6 +878,17 @@ export default class SkaldenliedScene extends Phaser.Scene {
       const len = Math.hypot(vx, vy) || 1;
       this.player.setVelocity(vx / len * this.player.speed, vy / len * this.player.speed);
       this.skaldenlied.markAction();
+      // Horizontal flip toward movement
+      if (vx > 0.1 && this._playerFacing !== 1) {
+        this._playerFacing = 1;
+        this.player.setScale(this._playerBaseScale, Math.abs(this.player.scaleY));
+      } else if (vx < -0.1 && this._playerFacing !== -1) {
+        this._playerFacing = -1;
+        this.player.setScale(-this._playerBaseScale, Math.abs(this.player.scaleY));
+      }
+      // Walk bob — slight y oscillation
+      this._walkBob = (this._walkBob || 0) + delta * 0.012;
+      this.player.y += Math.sin(this._walkBob) * 0.35;
     } else {
       this.player.setVelocity(0, 0);
     }
@@ -911,7 +941,8 @@ export default class SkaldenliedScene extends Phaser.Scene {
     const waveScale = 1 + (this._waveIndex - 1) * 0.15;
 
     if (kind === 'fenrir' && this.textures.exists('enemy_fenrir')) {
-      const e = this.physics.add.sprite(ox, oy, 'enemy_fenrir');
+      const cleanKey = makeBlackTransparent(this, 'enemy_fenrir');
+      const e = this.physics.add.sprite(ox, oy, cleanKey);
       e.setScale(0.08);
       e.setCircle(220, 320, 380);
       e.hp = Math.round(36 * waveScale);
@@ -927,7 +958,8 @@ export default class SkaldenliedScene extends Phaser.Scene {
     }
 
     if (kind === 'skinwalker' && this.textures.exists('enemy_skinwalker')) {
-      const e = this.physics.add.sprite(ox, oy, 'enemy_skinwalker');
+      const cleanKey = makeBlackTransparent(this, 'enemy_skinwalker');
+      const e = this.physics.add.sprite(ox, oy, cleanKey);
       e.setScale(0.075);
       e.setCircle(280, 300, 380);
       e.hp = Math.round(50 * waveScale);
@@ -979,7 +1011,9 @@ export default class SkaldenliedScene extends Phaser.Scene {
     shakeHeavy(this);
 
     // Use the Higgsfield-painted king if loaded, fallback procedural
-    const key = this.textures.exists('draugr_king_img') ? 'draugr_king_img' : createDraugrKingTexture(this);
+    const key = this.textures.exists('draugr_king_img')
+      ? makeBlackTransparent(this, 'draugr_king_img')
+      : createDraugrKingTexture(this);
     // Spawn the king directly in front of the player, far enough that he walks in
     const px = this.player ? this.player.x : CENTER_X;
     const py = this.player ? this.player.y : CENTER_Y;

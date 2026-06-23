@@ -9,6 +9,7 @@
 
 import { CSS_COLORS } from '../data/design-system.js';
 import { SKALDS } from '../data/skalds.js';
+import { makeBlackTransparent } from '../utils/SpritePostprocess.js';
 
 export default class SkaldSelectScene extends Phaser.Scene {
   constructor() { super('SkaldSelectScene'); }
@@ -73,10 +74,11 @@ export default class SkaldSelectScene extends Phaser.Scene {
     backdrop.fillStyle(0x06000F, 1)
       .fillRoundedRect(rx + 16, ry + 16, w - 32, w - 32, 6);
 
-    // Portrait
+    // Portrait — Higgsfield JPG, strip black background
     let portrait = null;
     if (this.textures.exists(skald.portrait)) {
-      portrait = this.add.image(cx, ry + 130, skald.portrait)
+      const cleanKey = makeBlackTransparent(this, skald.portrait);
+      portrait = this.add.image(cx, ry + 130, cleanKey)
         .setDisplaySize(w - 32, w - 32)
         .setDepth(3);
       // Multiply blend mode darkens any white edges (helps PNGs with white bg)
