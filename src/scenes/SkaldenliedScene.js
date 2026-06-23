@@ -29,8 +29,8 @@ import {
 } from '../utils/SkaldenliedArt.js';
 import { audio } from '../audio/AudioBus.js';
 
-const ROOM_W = 8000;
-const ROOM_H = 8000;
+const ROOM_W = 4000;
+const ROOM_H = 4000;
 const CENTER_X = ROOM_W / 2;
 const CENTER_Y = ROOM_H / 2;
 const HIGGSFIELD_SIZE = 1800; // Higgsfield bg covers the central spawn area
@@ -115,35 +115,25 @@ export default class SkaldenliedScene extends Phaser.Scene {
   }
 
   _drawRoom() {
-    // Procedural tile-able floor pattern covers the WHOLE 8000×8000 world
+    // Single big floor fill — one rect, no per-tile draws
     const floor = this.add.graphics().setDepth(-2);
-    const TILE = 256;
-    for (let tx = 0; tx < ROOM_W; tx += TILE) {
-      for (let ty = 0; ty < ROOM_H; ty += TILE) {
-        // Outer void color
-        floor.fillStyle(0x0A0612, 1).fillRect(tx, ty, TILE, TILE);
-        // Subtle vein cracks
-        if ((tx + ty) % (TILE * 2) === 0) {
-          floor.lineStyle(1, 0x2A1C36, 0.5);
-          floor.beginPath();
-          floor.moveTo(tx, ty + TILE / 2);
-          floor.lineTo(tx + TILE / 3, ty + TILE / 2 + 20);
-          floor.lineTo(tx + TILE, ty + TILE / 2 - 18);
-          floor.strokePath();
-        }
-        // Sparse rune carving — very rare
-        if (Math.random() < 0.02) {
-          floor.lineStyle(1, 0xC9A961, 0.25);
-          const rx = tx + 30 + Math.random() * (TILE - 60);
-          const ry = ty + 30 + Math.random() * (TILE - 60);
-          floor.beginPath();
-          floor.moveTo(rx - 8, ry - 8);
-          floor.lineTo(rx + 8, ry + 8);
-          floor.moveTo(rx + 8, ry - 8);
-          floor.lineTo(rx - 8, ry + 8);
-          floor.strokePath();
-        }
-      }
+    floor.fillStyle(0x0A0612, 1).fillRect(0, 0, ROOM_W, ROOM_H);
+
+    // Sparse rune carvings (single graphics pass)
+    floor.lineStyle(1, 0xC9A961, 0.20);
+    const RUNE_COUNT = 36;
+    for (let i = 0; i < RUNE_COUNT; i++) {
+      const rx = Math.random() * ROOM_W;
+      const ry = Math.random() * ROOM_H;
+      // Skip near center (Higgsfield area covers it)
+      const dx = rx - CENTER_X, dy = ry - CENTER_Y;
+      if (dx * dx + dy * dy < HIGGSFIELD_SIZE * HIGGSFIELD_SIZE / 4) continue;
+      floor.beginPath();
+      floor.moveTo(rx - 8, ry - 8);
+      floor.lineTo(rx + 8, ry + 8);
+      floor.moveTo(rx + 8, ry - 8);
+      floor.lineTo(rx - 8, ry + 8);
+      floor.strokePath();
     }
 
     // Higgsfield Wurzelkammer ONLY at the center — as the sacred spawn area
@@ -163,7 +153,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
 
     // Distant Yggdrasil-root pillars scattered through the world
     const pillars = this.add.graphics().setDepth(-1.5);
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 10; i++) {
       const px = Math.random() * ROOM_W;
       const py = Math.random() * ROOM_H;
       // Skip pillars too close to the Higgsfield center

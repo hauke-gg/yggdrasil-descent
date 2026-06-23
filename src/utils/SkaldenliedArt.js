@@ -647,7 +647,7 @@ export function drawWurzelkammerFloor(g, W, H) {
  * Spawn an ongoing drift of mist particles across the room.
  */
 export function spawnMist(scene, W, H, depth = 35) {
-  const count = 18;
+  const count = 6;
   const out = [];
   for (let i = 0; i < count; i++) {
     const x = Math.random() * W;

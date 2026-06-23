@@ -20,29 +20,44 @@ export default class VerseComposerScene extends Phaser.Scene {
     // Dark background
     this.add.graphics().fillStyle(0x06000F, 1).fillRect(0, 0, W, H).setDepth(-2);
 
-    // Header
-    this.add.text(W / 2, 40, 'KOMPONIERE DEIN LIED', {
-      fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '24px',
+    // Dynamic layout — fit everything in the viewport
+    // Allocations as % of H:
+    //  header band     0   – 8%
+    //  library 3×3     9   – 53%
+    //  divider         54%
+    //  "DEIN LIED"     56%
+    //  slots           58% – 76%
+    //  STEIG HINAB     80% – 90%
+    //  footer hint     95%
+
+    const headerY = Math.max(28, H * 0.045);
+    const subHeadY = headerY + 28;
+
+    this.add.text(W / 2, headerY, 'KOMPONIERE DEIN LIED', {
+      fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '22px',
       color: '#FFD66B', fontStyle: 'bold', letterSpacing: 5,
       stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(10);
 
-    this.add.text(W / 2, 72, 'Drei Verse. Drei Trigger. Eine Geschichte, die du selbst erfindest.', {
+    this.add.text(W / 2, subHeadY, 'Drei Verse. Drei Trigger. Eine Geschichte, die du selbst erfindest.', {
       fontFamily: "'Lora', serif", fontStyle: 'italic',
       fontSize: '12px', color: '#a89888',
     }).setOrigin(0.5).setDepth(10);
 
-    // Library cards — 3×3 grid, scale to viewport
+    // Library cards — 3×3 grid sized to fit allocation band
     this._chosenIds = [];
     this._libraryCards = [];
     const cols = 3, rows = Math.ceil(VERSE_LIBRARY.length / cols);
-    const lgap = 10;
-    const availW = W - 40;
-    const lw = Math.min(220, Math.floor((availW - (cols - 1) * lgap) / cols));
-    const lh = Math.min(95, Math.floor((H * 0.45 - (rows - 1) * lgap) / rows));
+    const lgap = 8;
+    const libTop = H * 0.09;
+    const libBottom = H * 0.53;
+    const libBandH = libBottom - libTop;
+    const availW = W - 36;
+    const lw = Math.min(240, Math.floor((availW - (cols - 1) * lgap) / cols));
+    const lh = Math.min(95, Math.floor((libBandH - (rows - 1) * lgap) / rows));
     const gridW = cols * lw + (cols - 1) * lgap;
     const startX = W / 2 - gridW / 2 + lw / 2;
-    const startY = 110;
+    const startY = libTop + lh / 2;
     VERSE_LIBRARY.forEach((lib, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
@@ -51,34 +66,33 @@ export default class VerseComposerScene extends Phaser.Scene {
       this._libraryCards.push(this._createLibraryCard(lib, cx, cy, lw, lh));
     });
 
-    // Section divider
-    const dividerY = startY + rows * (lh + lgap) + 12;
+    // Divider + "DEIN LIED" header
+    const dividerY = H * 0.54;
     const div = this.add.graphics().setDepth(2);
     div.lineStyle(1, 0xC9A961, 0.4)
       .lineBetween(W * 0.15, dividerY, W * 0.85, dividerY);
-
-    this.add.text(W / 2, dividerY + 18, '— DEIN LIED —', {
+    this.add.text(W / 2, H * 0.565, '— DEIN LIED —', {
       fontFamily: "'Cinzel', serif", fontSize: '13px',
       color: '#FFD66B', fontStyle: 'bold', letterSpacing: 4,
     }).setOrigin(0.5).setDepth(10);
 
-    // Three slots — also scale
-    const sgap = 16;
+    // Three slots — fit allocation 58–76%
+    const sgap = 14;
     const sAvailW = W - 60;
     const sw = Math.min(280, Math.floor((sAvailW - 2 * sgap) / 3));
-    const sh = 70;
+    const sh = Math.min(64, Math.floor((H * 0.76 - H * 0.58) - 6));
     const slotsW = 3 * sw + 2 * sgap;
     const slotStartX = W / 2 - slotsW / 2 + sw / 2;
-    const slotY = dividerY + 56;
+    const slotY = H * 0.67;
     this._slots = [];
     for (let i = 0; i < 3; i++) {
       const cx = slotStartX + i * (sw + sgap);
       this._slots.push(this._createSlot(i, cx, slotY, sw, sh));
     }
 
-    // "Steig hinab" button (initially disabled)
-    const btnW = 280, btnH = 50;
-    const btnX = W / 2, btnY = slotY + sh / 2 + 56;
+    // "Steig hinab" button — always at fixed bottom band
+    const btnW = Math.min(280, W * 0.4), btnH = 46;
+    const btnX = W / 2, btnY = H * 0.86;
     this._descendBg = this.add.graphics().setDepth(5);
     this._descendLabel = this.add.text(btnX, btnY, 'STEIG HINAB', {
       fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '18px',
@@ -98,11 +112,18 @@ export default class VerseComposerScene extends Phaser.Scene {
       if (this._chosenIds.length === 3) this._descend();
     });
 
-    // ESC back
-    this.add.text(W - 20, H - 16, 'ESC — zurück', {
-      fontFamily: "'Space Mono', monospace", fontSize: '10px',
-      color: '#5a4a6a',
-    }).setOrigin(1, 1).setDepth(10);
+    // ESC back / Touch back
+    const onTouch = (typeof window !== 'undefined') &&
+      (('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0);
+    const backLabel = onTouch ? '← zurück' : 'ESC — zurück';
+    const backText = this.add.text(20, H - 16, backLabel, {
+      fontFamily: "'Space Mono', monospace", fontSize: '11px',
+      color: '#7a7080',
+    }).setOrigin(0, 1).setDepth(10);
+    if (onTouch) {
+      backText.setInteractive({ useHandCursor: true });
+      backText.on('pointerdown', () => this.scene.start('SkaldSelectScene'));
+    }
     this.input.keyboard.on('keydown-ESC', () => this.scene.start('SkaldSelectScene'));
   }
 
