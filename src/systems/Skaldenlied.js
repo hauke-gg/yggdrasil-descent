@@ -17,8 +17,19 @@ export default class Skaldenlied {
     this.rhythmBpm = 105;
     this.lastAction = scene.time.now;
     this.silenceTriggered = false;
-    this._cooldowns = {};
+    this._cooldowns = {};        // passive-trigger cooldowns
+    this._activeCooldowns = [0, 0, 0]; // active-cast cooldowns per slot (ms wall time)
+    this._activeCdMs = [2200, 1800, 2600]; // tuned per slot
     this._silenceMs = 3000;
+
+    // Combo
+    this.combo = 0;              // 0..3.0 multiplier
+    this._lastCastAt = 0;
+    this._comboDecayDelay = 2000;
+
+    // Swirl
+    this._swirlCdUntil = 0;
+    this._swirlCdMs = 4000;
 
     this._rhythmEvent = scene.time.addEvent({
       delay: 60000 / this.rhythmBpm,
@@ -36,6 +47,76 @@ export default class Skaldenlied {
         }
       },
     });
+
+    // Combo decay tick
+    this._comboTick = scene.time.addEvent({
+      delay: 100,
+      loop: true,
+      callback: () => {
+        if (this.combo > 0 && scene.time.now - this._lastCastAt > this._comboDecayDelay) {
+          this.combo = Math.max(0, this.combo - 0.06);
+          if (this.onComboChange) this.onComboChange(this.combo);
+        }
+      },
+    });
+  }
+
+  /**
+   * Active cast — player pressed 1/2/3. Returns true if fired, false if on cooldown.
+   * Active casts skip the trigger check and resolve immediately with a bonus mult.
+   */
+  castActive(slotIdx) {
+    if (slotIdx < 0 || slotIdx >= this.verses.length) return false;
+    const now = this.scene.time.now;
+    if (now < this._activeCooldowns[slotIdx]) return false;
+    this._activeCooldowns[slotIdx] = now + this._activeCdMs[slotIdx];
+    const verse = this.verses[slotIdx];
+    this.markAction();
+    this._lastCastAt = now;
+    this.combo = Math.min(3.0, this.combo + 0.5);
+    if (this.onComboChange) this.onComboChange(this.combo);
+    if (this.onVerseFired) this.onVerseFired(verse, true);
+    this._resolve(verse, /*activeBonus*/ 1.5);
+    return true;
+  }
+
+  getActiveCooldownProgress(slotIdx) {
+    const now = this.scene.time.now;
+    const cdEnd = this._activeCooldowns[slotIdx] || 0;
+    const cdLen = this._activeCdMs[slotIdx] || 1;
+    const remaining = Math.max(0, cdEnd - now);
+    return 1 - remaining / cdLen; // 1 = ready, 0 = just fired
+  }
+
+  registerHit() {
+    if (this.scene.time.now - this._lastCastAt < this._comboDecayDelay) {
+      this.combo = Math.min(3.0, this.combo + 0.04);
+      if (this.onComboChange) this.onComboChange(this.combo);
+    }
+  }
+
+  comboMultiplier() {
+    return 1 + this.combo;
+  }
+
+  canSwirl() {
+    return this.scene.time.now >= this._swirlCdUntil;
+  }
+
+  triggerSwirl() {
+    if (!this.canSwirl()) return false;
+    this._swirlCdUntil = this.scene.time.now + this._swirlCdMs;
+    this.markAction();
+    this._lastCastAt = this.scene.time.now;
+    this.combo = Math.min(3.0, this.combo + 0.3);
+    if (this.onComboChange) this.onComboChange(this.combo);
+    return true;
+  }
+
+  swirlCooldownProgress() {
+    const now = this.scene.time.now;
+    const remaining = Math.max(0, this._swirlCdUntil - now);
+    return 1 - remaining / this._swirlCdMs;
   }
 
   markAction() {
@@ -81,28 +162,28 @@ export default class Skaldenlied {
     return 500;
   }
 
-  _resolve(verse) {
+  _resolve(verse, extraMult = 1.0) {
     const scene = this.scene;
     const player = scene.player;
     if (!player) return;
     const synergyMult = verse.synergy ? 1.5 : 1.0;
-
-    if (this.onVerseFired) this.onVerseFired(verse);
+    const comboMult = this.comboMultiplier();
+    const mult = synergyMult * comboMult * extraMult;
 
     if (verse.verb.id === 'bind') {
-      const heal = (verse.object.heal || 5) * synergyMult;
+      const heal = (verse.object.heal || 5) * mult;
       player.hp = Math.min(player.maxHp, player.hp + heal);
       return;
     }
 
     if (verse.verb.id === 'burst') {
-      const dmg = (verse.object.damage || 12) * synergyMult;
+      const dmg = (verse.object.damage || 12) * mult;
       this._spawnBurst(player.x, player.y, dmg);
       return;
     }
 
     if (verse.verb.id === 'strike') {
-      const dmg = (verse.object.damage || 24) * synergyMult;
+      const dmg = (verse.object.damage || 24) * mult;
       this._spawnStrike(player.x, player.y, dmg);
       return;
     }
@@ -115,7 +196,7 @@ export default class Skaldenlied {
     }
 
     if (verse.verb.id === 'nova') {
-      const dmg = (verse.object.damage || 40) * synergyMult;
+      const dmg = (verse.object.damage || 40) * mult;
       const radius = verse.object.radius || 140;
       this._spawnNova(player.x, player.y, radius, dmg);
       return;
@@ -204,5 +285,6 @@ export default class Skaldenlied {
   destroy() {
     this._rhythmEvent?.remove();
     this._silenceCheck?.remove();
+    this._comboTick?.remove();
   }
 }

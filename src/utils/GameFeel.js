@@ -4,24 +4,24 @@
  */
 
 export const FEEL = {
-  HIT_PAUSE_NORMAL: 60,
-  HIT_PAUSE_CRIT:   120,
-  SHAKE_NORMAL:     { amp: 2, decay: 80 },
-  SHAKE_HEAVY:      { amp: 5, decay: 180 },
-  SHAKE_BOSS:       { amp: 9, decay: 400, rot: 0.5 },
-  SLOW_MO_FACTOR:   0.35,
-  SLOW_MO_HOLD:     600,
-  SLOW_MO_EASE:     400,
-  SQUASH:           { x: 1.3, y: 0.7, hold: 50, bounce: 120 },
+  HIT_PAUSE_NORMAL: 100,
+  HIT_PAUSE_CRIT:   200,
+  SHAKE_NORMAL:     { amp: 3, decay: 120 },
+  SHAKE_HEAVY:      { amp: 8, decay: 240 },
+  SHAKE_BOSS:       { amp: 14, decay: 500, rot: 0.7 },
+  SLOW_MO_FACTOR:   0.3,
+  SLOW_MO_HOLD:     700,
+  SLOW_MO_EASE:     500,
+  SQUASH:           { x: 1.4, y: 0.65, hold: 60, bounce: 140 },
   POPUP_FROM:       0.5,
-  POPUP_PEAK:       1.4,
-  POPUP_TO:         1.0,
-  POPUP_DUR:        200,
-  POPUP_RISE:       60,
-  POPUP_RISE_DUR:   400,
-  CRIT_ZOOM:        1.08,
-  CRIT_ZOOM_IN:     40,
-  CRIT_ZOOM_OUT:    200,
+  POPUP_PEAK:       1.7,
+  POPUP_TO:         1.15,
+  POPUP_DUR:        220,
+  POPUP_RISE:       70,
+  POPUP_RISE_DUR:   480,
+  CRIT_ZOOM:        1.10,
+  CRIT_ZOOM_IN:     45,
+  CRIT_ZOOM_OUT:    230,
 };
 
 /**
@@ -89,11 +89,12 @@ export function squashStretch(scene, sprite) {
 export function damagePopup(scene, x, y, value, crit = false) {
   const text = scene.add.text(x, y, String(value), {
     fontFamily: "'Cinzel', serif",
-    fontSize: crit ? '28px' : '16px',
+    fontSize: crit ? '44px' : '22px',
     color: crit ? '#FFD66B' : '#FFFFFF',
     stroke: '#000000',
-    strokeThickness: crit ? 4 : 3,
+    strokeThickness: crit ? 5 : 3,
     fontStyle: crit ? 'bold' : 'normal',
+    shadow: crit ? { offsetX: 0, offsetY: 0, color: '#FFB45A', blur: 12, fill: true } : null,
   }).setOrigin(0.5).setDepth(100);
   if (crit) text.setRotation((Math.random() * 16 - 8) * Math.PI / 180);
   text.setScale(FEEL.POPUP_FROM);
@@ -174,7 +175,7 @@ export function critPunch(scene) {
  */
 export function hitBurst(scene, x, y, dirX, dirY, color = 0xff4444) {
   const angle = Math.atan2(dirY, dirX);
-  const count = 6 + Math.floor(Math.random() * 4);
+  const count = 10 + Math.floor(Math.random() * 6);
   for (let i = 0; i < count; i++) {
     const spread = (Math.random() - 0.5) * Math.PI / 2;
     const a = angle + spread;

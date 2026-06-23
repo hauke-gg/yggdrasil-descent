@@ -54,17 +54,26 @@ export default class SkaldenliedScene extends Phaser.Scene {
 
     this.enemies = this.physics.add.group();
     this.skaldenlied = new Skaldenlied(this, { verses: DEFAULT_VERSES });
-    this.skaldenlied.onVerseFired = (verse) => {
-      this._flashVerse(verse);
-      const color = verse.synergy ? 0xFFD66B : 0xcc88ff;
+    this.skaldenlied.onVerseFired = (verse, active = false) => {
+      this._flashVerse(verse, active);
+      const color = active ? 0xFFD66B : (verse.synergy ? 0xFFD66B : 0xcc88ff);
       playVerseTriggerFx(this, this.player.x, this.player.y, color);
+      if (active) {
+        audio.cast();
+        this._castRing(color);
+      }
     };
+    this.skaldenlied.onComboChange = (combo) => this._updateComboUI(combo);
 
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
 
     // Input
-    this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC');
+    this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,ONE,TWO,THREE,SPACE');
     this.input.keyboard.on('keydown-ESC', () => this._returnToMenu());
+    this.input.keyboard.on('keydown-ONE',   () => this._tryCast(0));
+    this.input.keyboard.on('keydown-TWO',   () => this._tryCast(1));
+    this.input.keyboard.on('keydown-THREE', () => this._tryCast(2));
+    this.input.keyboard.on('keydown-SPACE', () => this._trySwirl());
 
     // Spawner — three corners, escalating rate
     this._spawnTimer = this.time.addEvent({
@@ -199,11 +208,18 @@ export default class SkaldenliedScene extends Phaser.Scene {
     }).setOrigin(1, 0.5).setDepth(82).setScrollFactor(0);
 
     // Center title
-    this.add.text(W / 2, 22, 'WURZELKAMMER', {
-      fontFamily: "'Cinzel', serif", fontSize: '14px',
+    this.add.text(W / 2, 14, 'WURZELKAMMER', {
+      fontFamily: "'Cinzel', serif", fontSize: '13px',
       color: CSS_COLORS.goldLight, fontStyle: 'bold',
       stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(82).setScrollFactor(0);
+    }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
+
+    // Combo indicator below title
+    this._comboText = this.add.text(W / 2, 32, '×1.0', {
+      fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '14px',
+      color: '#7a7080', fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
 
     // Verse panel — bottom strip with Norse ornament
     const panelH = 120;
@@ -221,6 +237,8 @@ export default class SkaldenliedScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(82).setScrollFactor(0);
 
     this._verseTexts = [];
+    this._castHints = [];
+    this._cooldownBars = [];
     const verseGap = W / 3;
     DEFAULT_VERSES.forEach((v, i) => {
       const cx = verseGap * i + verseGap / 2;
@@ -235,26 +253,46 @@ export default class SkaldenliedScene extends Phaser.Scene {
         div.lineBetween(divX, panelY + 32, divX, panelY + panelH - 12);
       }
 
+      // Keyboard hint badge
+      const keyBadge = this.add.graphics().setDepth(82).setScrollFactor(0);
+      keyBadge.fillStyle(0x0E0A18, 0.9).fillRoundedRect(cx - 110, panelY + 36, 22, 22, 3);
+      keyBadge.lineStyle(1, 0xC9A961, 0.7).strokeRoundedRect(cx - 110, panelY + 36, 22, 22, 3);
+      const keyText = this.add.text(cx - 99, panelY + 47, String(i + 1), {
+        fontFamily: "'Cinzel', serif", fontSize: '12px',
+        color: CSS_COLORS.goldLight, fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(83).setScrollFactor(0);
+
       // Stab-letter badge — large alliteration letter
-      const badge = this.add.text(cx - 90, panelY + 50, stab, {
-        fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '32px',
+      const badge = this.add.text(cx - 70, panelY + 50, stab, {
+        fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '30px',
         color: stabColor, fontStyle: 'bold',
         stroke: '#000', strokeThickness: 3,
       }).setOrigin(0.5).setDepth(82).setScrollFactor(0).setAlpha(0.55);
 
-      const t = this.add.text(cx + 10, panelY + 42, v.text, {
-        fontFamily: "'Lora', serif", fontSize: '13px',
-        color: '#e8dcc0', align: 'left', wordWrap: { width: verseGap - 100 },
+      const t = this.add.text(cx + 20, panelY + 38, v.text, {
+        fontFamily: "'Lora', serif", fontSize: '12px',
+        color: '#e8dcc0', align: 'left', wordWrap: { width: verseGap - 110 },
         lineSpacing: 2,
       }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
 
-      const sub = this.add.text(cx + 10, panelY + 90, v.trigger.desc, {
+      const sub = this.add.text(cx + 20, panelY + 86, v.trigger.desc, {
         fontFamily: "'Space Mono', monospace", fontSize: '9px',
-        color: '#7a7080', align: 'left', wordWrap: { width: verseGap - 100 },
+        color: '#7a7080', align: 'left', wordWrap: { width: verseGap - 110 },
       }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
 
-      this._verseTexts.push({ text: t, sub, badge });
+      // Cooldown bar (horizontal under the verse)
+      const cdBar = this.add.graphics().setDepth(82).setScrollFactor(0);
+      this._cooldownBars.push({ gfx: cdBar, cx, panelY, panelH, color: stabColor });
+
+      this._verseTexts.push({ text: t, sub, badge, keyText, keyBadge });
     });
+
+    // SPACE hint bottom-center on top of panel border
+    this._swirlHint = this.add.graphics().setDepth(82).setScrollFactor(0);
+    this._swirlHintText = this.add.text(W / 2, panelY - 22, '[SPACE] Skalden-Wirbel', {
+      fontFamily: "'Space Mono', monospace", fontSize: '10px',
+      color: '#8a7080', letterSpacing: 1,
+    }).setOrigin(0.5).setDepth(82).setScrollFactor(0);
 
     // ESC hint
     this.add.text(W - 12, H - 8, 'ESC = Menü', {
@@ -262,31 +300,183 @@ export default class SkaldenliedScene extends Phaser.Scene {
     }).setOrigin(1, 1).setDepth(83).setScrollFactor(0);
   }
 
-  _flashVerse(verse) {
+  _flashVerse(verse, active = false) {
     const idx = DEFAULT_VERSES.indexOf(verse);
     if (idx < 0 || !this._verseTexts[idx]) return;
     const entry = this._verseTexts[idx];
     const t = entry.text;
     const badge = entry.badge;
-    const color = verse.synergy ? '#FFD66B' : '#cc88ff';
+    const color = active ? '#FFD66B' : (verse.synergy ? '#FFD66B' : '#cc88ff');
     t.setColor(color);
     if (badge) {
       badge.setAlpha(1);
       this.tweens.add({
         targets: badge,
-        scale: { from: 1.0, to: 1.3 },
+        scale: { from: 1.0, to: active ? 1.6 : 1.3 },
         duration: 180,
         yoyo: true,
         onComplete: () => { badge.setScale(1); badge.setAlpha(0.55); },
       });
     }
+    if (active && entry.keyBadge) {
+      this.tweens.add({
+        targets: entry.keyText,
+        scale: { from: 1.0, to: 1.5 },
+        duration: 140,
+        yoyo: true,
+        onComplete: () => entry.keyText.setScale(1),
+      });
+    }
     this.tweens.add({
       targets: t,
-      scale: { from: 1.0, to: 1.12 },
+      scale: { from: 1.0, to: active ? 1.18 : 1.12 },
       duration: 140,
       yoyo: true,
       onComplete: () => t.setColor('#e8dcc0'),
     });
+  }
+
+  _tryCast(slotIdx) {
+    if (!this.skaldenlied) return;
+    if (this.player.hp <= 0) return;
+    const fired = this.skaldenlied.castActive(slotIdx);
+    if (!fired) {
+      // Subtle feedback for failed cast
+      const entry = this._verseTexts[slotIdx];
+      if (entry && entry.keyText) {
+        this.tweens.add({
+          targets: entry.keyText,
+          alpha: { from: 0.4, to: 1 },
+          duration: 200,
+          yoyo: true,
+        });
+      }
+    }
+  }
+
+  _trySwirl() {
+    if (!this.skaldenlied || this.player.hp <= 0) return;
+    if (!this.skaldenlied.triggerSwirl()) return;
+    audio.cast();
+    audio.bossHorn(); // satisfying low pulse
+    // Hit-stop + heavy shake
+    hitPause(this, 80);
+    shakeHeavy(this);
+    // Expand wave ring
+    const x = this.player.x, y = this.player.y;
+    const radius = 220;
+    const ring = this.add.circle(x, y, 8, 0xFFB45A, 0)
+      .setStrokeStyle(4, 0xFFD66B, 1).setDepth(28);
+    this.tweens.add({
+      targets: ring, radius, alpha: 0,
+      duration: 480, ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
+    });
+    // Damage + knockback all in radius
+    if (this.enemies) {
+      this.enemies.children.iterate((e) => {
+        if (!e || !e.active) return;
+        const dx = e.x - x, dy = e.y - y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d <= radius) {
+          const dmg = 22 * this.skaldenlied.comboMultiplier();
+          this.damageEnemy(e, dmg, x, y);
+          if (e.body) {
+            e.body.setVelocity(dx / d * 480, dy / d * 480);
+            // damp after a beat
+            this.time.delayedCall(180, () => { if (e && e.active && e.body) e.body.setVelocity(0, 0); });
+          }
+        }
+      });
+    }
+  }
+
+  _castRing(color) {
+    const x = this.player.x, y = this.player.y;
+    const ring = this.add.circle(x, y, 6, color, 0)
+      .setStrokeStyle(3, color, 1).setDepth(28);
+    this.tweens.add({
+      targets: ring, radius: 90, alpha: 0,
+      duration: 360, ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
+    });
+    // Cast-flash on screen edges
+    const W = this.scale.width, H = this.scale.height;
+    const flash = this.add.graphics().setDepth(160).setScrollFactor(0);
+    const r = (color >> 16) & 255, g = (color >> 8) & 255, b = color & 255;
+    flash.fillStyle(color, 0.18);
+    flash.fillRect(0, 0, W, 12);
+    flash.fillRect(0, H - 12, W, 12);
+    flash.fillRect(0, 0, 12, H);
+    flash.fillRect(W - 12, 0, 12, H);
+    this.tweens.add({ targets: flash, alpha: 0, duration: 350, onComplete: () => flash.destroy() });
+  }
+
+  _critStamp(x, y) {
+    const stamp = this.add.text(x, y - 50, 'CRIT!', {
+      fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '22px',
+      color: '#FFD66B', fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 4,
+      shadow: { offsetX: 0, offsetY: 0, color: '#FFB45A', blur: 14, fill: true },
+    }).setOrigin(0.5).setDepth(110)
+      .setRotation((Math.random() * 16 - 8) * Math.PI / 180)
+      .setScale(0.6).setAlpha(0);
+    this.tweens.add({
+      targets: stamp,
+      scale: 1.2, alpha: 1,
+      duration: 100, ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: stamp, alpha: 0, y: y - 80,
+          duration: 380, delay: 120, ease: 'Cubic.easeIn',
+          onComplete: () => stamp.destroy(),
+        });
+      },
+    });
+  }
+
+  _updateComboUI(combo) {
+    if (!this._comboText) return;
+    const mult = 1 + combo;
+    this._comboText.setText(`×${mult.toFixed(1)}`);
+    if (combo > 1.5) this._comboText.setColor('#FFD66B').setFontSize(16);
+    else if (combo > 0.5) this._comboText.setColor('#cc88ff').setFontSize(15);
+    else this._comboText.setColor('#7a7080').setFontSize(14);
+    this.tweens.add({
+      targets: this._comboText,
+      scale: { from: 1, to: 1.18 }, duration: 120, yoyo: true,
+    });
+  }
+
+  _updateCooldownBars() {
+    if (!this._cooldownBars || !this.skaldenlied) return;
+    this._cooldownBars.forEach((bar, i) => {
+      const p = this.skaldenlied.getActiveCooldownProgress(i);
+      bar.gfx.clear();
+      const barW = 100;
+      const barX = bar.cx - barW / 2;
+      const barY = bar.panelY + bar.panelH - 12;
+      // Background
+      bar.gfx.fillStyle(0x1A1422, 0.85).fillRect(barX, barY, barW, 3);
+      // Fill
+      if (p >= 1) {
+        bar.gfx.fillStyle(0xFFD66B, 1).fillRect(barX, barY, barW, 3);
+        // Pulse glow when ready
+        const pulse = 0.5 + Math.sin(this.time.now * 0.005) * 0.3;
+        bar.gfx.fillStyle(0xFFD66B, pulse * 0.4).fillRect(barX - 1, barY - 1, barW + 2, 5);
+      } else {
+        bar.gfx.fillStyle(0x9966ee, 0.7).fillRect(barX, barY, barW * p, 3);
+      }
+    });
+
+    // Swirl hint color
+    if (this._swirlHintText && this.skaldenlied) {
+      if (this.skaldenlied.canSwirl()) {
+        this._swirlHintText.setColor('#FFD66B');
+      } else {
+        this._swirlHintText.setColor('#5a4a6a');
+      }
+    }
   }
 
   update(time, delta) {
@@ -312,6 +502,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
 
     this._updateHpBar();
     this._updateEnemies(delta);
+    this._updateCooldownBars();
   }
 
   _updateHpBar() {
@@ -476,14 +667,22 @@ export default class SkaldenliedScene extends Phaser.Scene {
 
   damageEnemy(e, dmg, srcX, srcY) {
     if (!e || !e.active) return;
-    e.hp -= dmg;
-    const crit = Math.random() < 0.15;
+    const crit = Math.random() < 0.18;
     const finalDmg = crit ? dmg * 2 : dmg;
+    e.hp -= finalDmg;
     audio.hitLight();
-    damagePopup(this, e.x, e.y - 18, Math.floor(finalDmg), crit);
+    damagePopup(this, e.x, e.y - 22, Math.floor(finalDmg), crit);
     squashStretch(this, e);
-    if (crit) critPunch(this);
-    hitBurst(this, e.x, e.y, (e.x - (srcX || e.x)), (e.y - (srcY || e.y)), 0xff8844);
+    if (crit) {
+      critPunch(this);
+      this._critStamp(e.x, e.y);
+      hitPause(this, FEEL.HIT_PAUSE_CRIT);
+      shakeHeavy(this);
+    } else {
+      shakeNormal(this);
+    }
+    hitBurst(this, e.x, e.y, (e.x - (srcX || e.x)), (e.y - (srcY || e.y)), crit ? 0xFFD66B : 0xff8844);
+    this.skaldenlied?.registerHit();
     if (e.hp <= 0) {
       const wasBoss = e.kind === 'king';
       this._killsThisWave++;
