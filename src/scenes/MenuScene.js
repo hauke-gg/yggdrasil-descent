@@ -109,6 +109,43 @@ export default class MenuScene extends Phaser.Scene {
       this.scene.start('CharacterScene');
     });
 
+    // --- Sprint-1 Prototyp-Button ---
+    const protoW = 220, protoH = 38;
+    const protoX = cx - protoW / 2;
+    const protoY = btnY + btnH + 18;
+
+    const protoGfx = this.add.graphics();
+    protoGfx.fillStyle(0x0a0520, 0.92).fillRoundedRect(protoX, protoY, protoW, protoH, 4);
+    protoGfx.lineStyle(1, 0x6B4F5C, 0.9).strokeRoundedRect(protoX, protoY, protoW, protoH, 4);
+
+    const protoLabel = this.add.text(cx, protoY + protoH / 2, '▶ PROTOTYP: SKALDENLIED', {
+      fontFamily: "'Cinzel', serif", fontSize: '12px',
+      color: '#C9C4D1', fontStyle: 'bold', letterSpacing: 2,
+    }).setOrigin(0.5);
+
+    const protoHit = this.add.rectangle(cx, protoY + protoH / 2, protoW, protoH, 0x000000, 0)
+      .setInteractive({ useHandCursor: true });
+    protoHit.on('pointerover', () => {
+      protoGfx.clear();
+      protoGfx.fillStyle(0x1a0a33, 0.95).fillRoundedRect(protoX, protoY, protoW, protoH, 4);
+      protoGfx.lineStyle(1, 0xC9A961, 1).strokeRoundedRect(protoX, protoY, protoW, protoH, 4);
+      protoLabel.setColor('#FFD66B');
+    });
+    protoHit.on('pointerout', () => {
+      protoGfx.clear();
+      protoGfx.fillStyle(0x0a0520, 0.92).fillRoundedRect(protoX, protoY, protoW, protoH, 4);
+      protoGfx.lineStyle(1, 0x6B4F5C, 0.9).strokeRoundedRect(protoX, protoY, protoW, protoH, 4);
+      protoLabel.setColor('#C9C4D1');
+    });
+    protoHit.on('pointerdown', () => {
+      this.scene.start('SkaldenliedScene');
+    });
+
+    this.add.text(cx, protoY + protoH + 8, 'Sprint 1 — Hook-Test', {
+      fontFamily: "'Space Mono', monospace", fontSize: '9px',
+      color: '#5a4a6a',
+    }).setOrigin(0.5);
+
     // --- Version bottom-left ---
     this.add.text(12, H - 16, MENU.version, TEXT_STYLES.tiny)
       .setOrigin(0, 1);

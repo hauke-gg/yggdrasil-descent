@@ -4,6 +4,7 @@ import CharacterScene from './scenes/CharacterScene.js';
 import TutorialScene from './scenes/TutorialScene.js';
 import DungeonScene from './scenes/DungeonScene.js';
 import GameOverScene from './scenes/GameOverScene.js';
+import SkaldenliedScene from './scenes/SkaldenliedScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -21,7 +22,7 @@ const config = {
     default: 'arcade',
     arcade: { gravity: { y: 0 }, debug: false }
   },
-  scene: [BootScene, MenuScene, CharacterScene, TutorialScene, DungeonScene, GameOverScene]
+  scene: [BootScene, MenuScene, CharacterScene, TutorialScene, DungeonScene, GameOverScene, SkaldenliedScene]
 };
 
 window.game = new Phaser.Game(config);
