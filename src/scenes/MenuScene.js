@@ -8,22 +8,25 @@ export default class MenuScene extends Phaser.Scene {
     const W = this.scale.width, H = this.scale.height;
     const cx = W / 2, cy = H / 2;
 
-    // --- Background ---
-    const bg = this.add.graphics();
+    // --- Background (all negative depths so UI stays above) ---
+    const bg = this.add.graphics().setDepth(-10);
     bg.fillStyle(COLORS.void, 1);
     bg.fillRect(0, 0, W, H);
 
-    // Grid layer
-    const gridGfx = this.add.graphics();
-    drawGrid(gridGfx, W, H);
-
-    // Optional Higgsfield background
     if (this.textures.exists('menu_bg')) {
-      this.add.image(480, 270, 'menu_bg')
-        .setDisplaySize(960, 540)
-        .setDepth(-1)
-        .setAlpha(0.55);
+      this.add.image(cx, cy, 'menu_bg')
+        .setDisplaySize(W, H)
+        .setDepth(-9)
+        .setAlpha(0.72);
+      // Vignette keeps text readable
+      const vig = this.add.graphics().setDepth(-8);
+      vig.fillStyle(0x000000, 0.40);
+      vig.fillRect(0, 0, W, H);
     }
+
+    // Subtle grid (below UI elements)
+    const gridGfx = this.add.graphics().setDepth(-7);
+    drawGrid(gridGfx, W, H);
 
     // --- Rune deco circles (behind title) ---
     const decoGfx = this.add.graphics();

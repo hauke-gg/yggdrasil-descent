@@ -12,7 +12,10 @@ const config = {
   backgroundColor: '#06000f',
   scale: {
     mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: 960,
+    height: 540,
+    expandParent: false
   },
   input: {
     activePointers: 3

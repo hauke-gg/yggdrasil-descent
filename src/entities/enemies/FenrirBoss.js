@@ -3,7 +3,7 @@ import Enemy from '../Enemy.js';
 export default class FenrirBoss extends Enemy {
   constructor(scene, x, y) {
     const stats = { hp: 800, speed: 70, damage: 25, xpReward: 200, scale: 2.0 };
-    super(scene, x, y, 'boss_fenrir', stats);
+    super(scene, x, y, 'enemy_fenrir_wolf', stats);
 
     this._phase = 1;       // Phase 1: normal; Phase 2: bei <50% HP, schneller
     this._chargeTimer = 0;

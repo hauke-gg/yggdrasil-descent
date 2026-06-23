@@ -132,14 +132,18 @@ export default class WeaponSystem {
 
   _showAoeRing(x, y, radius, color) {
     const gfx = this.scene.add.graphics().setDepth(9);
-    gfx.lineStyle(3, color, 0.8);
+    // Draw double ring for better visual
+    gfx.lineStyle(4, color, 0.9);
     gfx.strokeCircle(x, y, radius);
-    this.scene.tweens.add({
-      targets: gfx,
-      alpha: 0,
-      duration: 300,
-      onComplete: () => gfx.destroy()
-    });
+    gfx.lineStyle(2, 0xffffff, 0.3);
+    gfx.strokeCircle(x, y, radius * 0.7);
+    // Fade out with setInterval (Phaser tweens broken in background tabs)
+    const start = Date.now();
+    const iv = setInterval(() => {
+      const p = Math.min(1, (Date.now() - start) / 300);
+      gfx.setAlpha(1 - p);
+      if (p >= 1) { clearInterval(iv); gfx.destroy(); }
+    }, 16);
   }
 
   _onEnemyDie(enemy) {

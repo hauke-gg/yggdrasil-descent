@@ -20,6 +20,10 @@ export default class DungeonScene extends Phaser.Scene {
   constructor() { super('DungeonScene'); }
 
   create() {
+    // Remove any stale DOM elements from CharacterScene
+    document.getElementById('ygg-name-input')?.remove();
+    document.querySelectorAll('style').forEach(s => { if (s.textContent.includes('ygg-name-input')) s.remove(); });
+
     const savedPlayer = JSON.parse(localStorage.getItem('ygg_player') || '{}');
     this._playerName = savedPlayer.name || 'Krieger';
     this._playerClass = savedPlayer.class || 'krieger';
@@ -45,25 +49,120 @@ export default class DungeonScene extends Phaser.Scene {
   }
 
   _drawWorld() {
-    const g = this.add.graphics().setDepth(-2);
+    const g = this.add.graphics().setDepth(-3);
+    const cx = WORLD_SIZE / 2, cy = WORLD_SIZE / 2;
 
-    g.fillStyle(0x1a0500);
+    // Dark void outer
+    g.fillStyle(0x030108, 1);
     g.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
 
-    g.fillStyle(0x050a1a);
-    g.fillCircle(2000, 2000, 1600);
+    // Midgaard biome: dark stone ruins floor
+    g.fillStyle(0x0e0c18, 1);
+    g.fillCircle(cx, cy, 1800);
+    g.fillStyle(0x12101e, 1);
+    g.fillCircle(cx, cy, 1400);
+    g.fillStyle(0x161422, 1);
+    g.fillCircle(cx, cy, 900);
 
-    g.fillStyle(0x080f08);
-    g.fillCircle(2000, 2000, 800);
+    // Stone floor pattern (large tiles with variation)
+    const tileG = this.add.graphics().setDepth(-2);
+    const TILE = 64;
+    for (let x = 0; x < WORLD_SIZE; x += TILE) {
+      for (let y = 0; y < WORLD_SIZE; y += TILE) {
+        const dx = x - cx, dy = y - cy;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 1900) continue;
+        // Stone tile base
+        const shade = dist < 900 ? 0x1e1c2c : dist < 1400 ? 0x181626 : 0x141220;
+        tileG.fillStyle(shade, 1);
+        tileG.fillRect(x+1, y+1, TILE-2, TILE-2);
+        // Tile grout lines
+        tileG.lineStyle(1, 0x0a0818, 0.8);
+        tileG.strokeRect(x+1, y+1, TILE-2, TILE-2);
+        // Subtle crack / variation in some tiles
+        const hash = (x * 7 + y * 13) % 100;
+        if (hash < 8) {
+          tileG.lineStyle(1, 0x0a0816, 0.5);
+          tileG.lineBetween(x+8, y+TILE*0.3, x+TILE*0.6, y+TILE*0.7);
+        }
+        if (hash > 92) {
+          tileG.fillStyle(0x0a0816, 0.3);
+          tileG.fillRect(x+TILE*0.2, y+TILE*0.2, TILE*0.3, TILE*0.3);
+        }
+      }
+    }
 
-    const gridG = this.add.graphics().setDepth(-1);
-    gridG.lineStyle(1, 0x1a3a1a, 0.2);
-    for (let x = 0; x <= WORLD_SIZE; x += 48) gridG.lineBetween(x, 0, x, WORLD_SIZE);
-    for (let y = 0; y <= WORLD_SIZE; y += 48) gridG.lineBetween(0, y, WORLD_SIZE, y);
+    // Runic circles — main altar glow
+    const runeG = this.add.graphics().setDepth(-1);
+
+    // Inner sacred circle — bright purple rune ring
+    runeG.lineStyle(3, 0x6644cc, 0.8);
+    runeG.strokeCircle(cx, cy, 300);
+    // Glow fill at center altar
+    runeG.fillStyle(0x3311aa, 0.08);
+    runeG.fillCircle(cx, cy, 300);
+
+    // Mid-range circles
+    runeG.lineStyle(2, 0x4422aa, 0.5);
+    runeG.strokeCircle(cx, cy, 600);
+    runeG.lineStyle(1, 0x331188, 0.35);
+    runeG.strokeCircle(cx, cy, 900);
+    runeG.lineStyle(1, 0x220066, 0.25);
+    runeG.strokeCircle(cx, cy, 1200);
+    runeG.lineStyle(1, 0x110044, 0.2);
+    runeG.strokeCircle(cx, cy, 1600);
+
+    // Cardinal rune lines — Norse cross pattern
+    runeG.lineStyle(1, 0x5533bb, 0.35);
+    [0, 45, 90, 135].forEach(deg => {
+      const rad = deg * Math.PI / 180;
+      runeG.lineBetween(cx + Math.cos(rad)*120, cy + Math.sin(rad)*120,
+                        cx + Math.cos(rad)*1700, cy + Math.sin(rad)*1700);
+      runeG.lineBetween(cx - Math.cos(rad)*120, cy - Math.sin(rad)*120,
+                        cx - Math.cos(rad)*1700, cy - Math.sin(rad)*1700);
+    });
+
+    // Rune notches on inner circle (8 equidistant marks)
+    for (let a = 0; a < 8; a++) {
+      const rad = (a / 8) * Math.PI * 2;
+      const ix = cx + Math.cos(rad) * 300;
+      const iy = cy + Math.sin(rad) * 300;
+      runeG.fillStyle(0x8866ff, 0.7);
+      runeG.fillCircle(ix, iy, 5);
+    }
+
+    // Atmospheric fog spots (dark pools in the world)
+    runeG.fillStyle(0x020106, 0.5);
+    [[cx-600,cy-700,280],[cx+720,cy+520,220],[cx-820,cy+640,320],[cx+640,cy-820,240]].forEach(([x,y,r]) => {
+      runeG.fillCircle(x, y, r);
+    });
+
+    // Scattered ruins (broken pillars with rune glow)
+    const ruins = this.add.graphics().setDepth(-1);
+    [
+      [cx-180, cy-220],[cx+200, cy-180],[cx-220, cy+190],[cx+180, cy+220],
+      [cx+480, cy-60],[cx-500, cy+80],[cx+60, cy-480],[cx-80, cy+500],
+      [cx+340, cy+340],[cx-360, cy-360],[cx+360, cy-360],[cx-340, cy+340],
+    ].forEach(([rx, ry]) => {
+      // Stone column base
+      ruins.fillStyle(0x1a1828, 1);
+      ruins.fillRect(rx-14, ry-14, 28, 28);
+      ruins.fillStyle(0x28263a, 1);
+      ruins.fillRect(rx-11, ry-11, 18, 18);
+      ruins.fillStyle(0x322e48, 1);
+      ruins.fillRect(rx-8, ry-8, 10, 10);
+      ruins.lineStyle(1, 0x5544aa, 0.5);
+      ruins.strokeRect(rx-14, ry-14, 28, 28);
+      // Purple rune glow pool around each ruin
+      ruins.fillStyle(0x4422cc, 0.12);
+      ruins.fillCircle(rx, ry, 24);
+      ruins.fillStyle(0x6644ff, 0.06);
+      ruins.fillCircle(rx, ry, 36);
+    });
   }
 
   _createPlayer() {
-    this._player = new Player(this, 2000, 2000);
+    this._player = new Player(this, 2000, 2000, this._playerClass);
     this._player.setCollideWorldBounds(true);
   }
 

@@ -1,12 +1,15 @@
 export default class Player extends Phaser.Physics.Arcade.Sprite {
-  constructor(scene, x, y) {
-    super(scene, x, y, 'player');
+  constructor(scene, x, y, playerClass = 'krieger') {
+    // Use class-specific sprite if available, else default
+    const textureKey = scene.textures.exists(playerClass) ? playerClass : 'player';
+    super(scene, x, y, textureKey);
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
     this.setCollideWorldBounds(true);
     this.setDepth(10);
+    this.setScale(1.5);
 
     // Stats
     this.maxHp = 100;

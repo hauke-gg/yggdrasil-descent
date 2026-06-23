@@ -63,11 +63,12 @@ export default class CharacterScene extends Phaser.Scene {
 
     // --- Class cards ---
     const classKeys = ['krieger', 'schatten', 'magier'];
-    const cardW = 185, cardH = 220;
-    const gap = 20;
+    const spriteKeys = { krieger: 'krieger', schatten: 'schatten', magier: 'magier' };
+    const cardW = 195, cardH = 250;
+    const gap = 22;
     const totalW = classKeys.length * cardW + (classKeys.length - 1) * gap;
     const startX = cx - totalW / 2 + cardW / 2;
-    const cardCY = H / 2 + 60;
+    const cardCY = H / 2 + 65;
 
     this._cardGraphics = [];
 
@@ -83,20 +84,24 @@ export default class CharacterScene extends Phaser.Scene {
       else            drawPanel(cardGfx, rx, ry, cardW, cardH);
       this._cardGraphics.push({ gfx: cardGfx, x: rx, y: ry, w: cardW, h: cardH, id: key });
 
-      // Icon
-      this.add.text(cardX, ry + 28, cls.icon, { ...TEXT_STYLES.heading, fontSize: '32px' })
-        .setOrigin(0.5);
+      // Character sprite preview (actual game sprite)
+      const spriteKey = spriteKeys[key];
+      if (this.textures.exists(spriteKey)) {
+        this.add.image(cardX, ry + 48, spriteKey)
+          .setScale(1.1)
+          .setDepth(1);
+      }
 
       // Class name
-      this.add.text(cardX, ry + 66, cls.name, TEXT_STYLES.cardTitle)
+      this.add.text(cardX, ry + 102, cls.name, TEXT_STYLES.cardTitle)
         .setOrigin(0.5);
 
       // Epithet
-      this.add.text(cardX, ry + 88, cls.epithet, TEXT_STYLES.caption)
+      this.add.text(cardX, ry + 122, cls.epithet, TEXT_STYLES.caption)
         .setOrigin(0.5);
 
-      // Description — maxLines prevents overflow below card
-      this.add.text(cardX, ry + 108, cls.desc, {
+      // Description
+      this.add.text(cardX, ry + 140, cls.desc, {
         fontFamily: "'Lora', serif", fontSize: '11px', color: '#cccac0',
         wordWrap: { width: cardW - 28 }, align: 'center',
         lineSpacing: 3, maxLines: 4

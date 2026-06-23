@@ -22,12 +22,12 @@ export const ENEMIES = {
   fenrir_wolf: {
     id: 'fenrir_wolf',
     name: 'Fenrir-Wolf',
-    texture: 'enemy_draugr',
+    texture: 'enemy_fenrir_wolf',
     hp: 25,
     speed: 130,
     damage: 6,
     xpReward: 8,
-    scale: 0.8
+    scale: 0.65
   }
 };
 
