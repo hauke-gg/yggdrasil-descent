@@ -14,14 +14,27 @@
   <meta name="theme-color" content="#06000f">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
-      background: #06000f;
-      overflow: hidden;
+    html {
       width: 100%;
       height: 100%;
+      background: #06000f;
+    }
+    body {
+      width: 100%;
+      height: 100%;
+      background: #06000f;
+      overflow: hidden;
       touch-action: none;
     }
-    canvas {
+    #game-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #06000f;
+    }
+    #game-container canvas {
       display: block;
       touch-action: none;
     }
@@ -62,6 +75,8 @@
   </style>
 </head>
 <body>
+  <div id="game-container"></div>
+
   <div id="rotate-overlay">
     <div class="icon">📱</div>
     <h2>Gerät drehen</h2>

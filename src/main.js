@@ -7,15 +7,13 @@ import GameOverScene from './scenes/GameOverScene.js';
 
 const config = {
   type: Phaser.AUTO,
-  width: 960,
-  height: 540,
   backgroundColor: '#06000f',
+  parent: 'game-container',
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: 960,
     height: 540,
-    expandParent: false
   },
   input: {
     activePointers: 3
