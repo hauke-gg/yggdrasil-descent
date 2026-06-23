@@ -134,11 +134,80 @@ export function composeVerse(triggerId, verbId, objectId) {
 }
 
 /**
+ * The full set of verse modules the composer can choose from.
+ * Each has a stab letter for synergy detection.
+ */
+export const VERSE_LIBRARY = [
+  {
+    id: 'weinende',
+    name: 'Die Weinende',
+    triggerId: 'onHit',  verbId: 'freeze', objectId: 'frost',
+    description: 'Bei niedriger HP: Frost-Aura verlangsamt alle Gegner.',
+  },
+  {
+    id: 'sturm',
+    name: 'Der Sturm',
+    triggerId: 'onTakeDamage', verbId: 'burst', objectId: 'wounds',
+    description: 'Bei jedem Treffer: 8 Geschosse in alle Richtungen.',
+  },
+  {
+    id: 'jaeger',
+    name: 'Der Jäger',
+    triggerId: 'onKill', verbId: 'strike', objectId: 'spear',
+    description: 'Bei jedem Kill: gezielter Speerwurf auf den nächsten Feind.',
+  },
+  {
+    id: 'trommel',
+    name: 'Die Trommel',
+    triggerId: 'onRhythm', verbId: 'burst', objectId: 'wounds',
+    description: 'Auf jeden Trommelschlag: kleine Wind-Salve.',
+  },
+  {
+    id: 'klage',
+    name: 'Die Klage',
+    triggerId: 'onHit', verbId: 'bind', objectId: 'blood',
+    description: 'Bei niedriger HP: heile dich um 5.',
+  },
+  {
+    id: 'leere',
+    name: 'Die Leere',
+    triggerId: 'onSilence', verbId: 'nova', objectId: 'silence',
+    description: 'Nach 3 Sek ohne Aktion: 40-Schaden-AoE um dich.',
+  },
+  {
+    id: 'frost-tanz',
+    name: 'Der Frost-Tanz',
+    triggerId: 'onKill', verbId: 'freeze', objectId: 'frost',
+    description: 'Bei jedem Kill: Frost-Aura friert nahe Gegner.',
+  },
+  {
+    id: 'donner',
+    name: 'Der Donner',
+    triggerId: 'onRhythm', verbId: 'strike', objectId: 'spear',
+    description: 'Auf jeden Trommelschlag: Speer auf den nächsten Feind.',
+  },
+  {
+    id: 'opfer',
+    name: 'Das Opfer',
+    triggerId: 'onTakeDamage', verbId: 'nova', objectId: 'silence',
+    description: 'Bei jedem Treffer: Riesen-Explosion um dich.',
+  },
+];
+
+/**
+ * Build verse objects (with computed synergy / stab data) from library ids.
+ */
+export function buildVerses(ids) {
+  return ids.map(id => {
+    const lib = VERSE_LIBRARY.find(v => v.id === id);
+    if (!lib) return null;
+    const composed = composeVerse(lib.triggerId, lib.verbId, lib.objectId);
+    return Object.assign({}, composed, { id, name: lib.name, description: lib.description });
+  }).filter(Boolean);
+}
+
+/**
  * Default starter verses — three pre-composed, one per stab.
  * The "Weinende Skalde" build is verse[0]: onHit → freeze → frost.
  */
-export const DEFAULT_VERSES = [
-  composeVerse('onHit',        'freeze', 'frost'),   // Weinende: on low HP, freeze enemies in frost
-  composeVerse('onTakeDamage', 'burst',  'wounds'),  // on hit, fire projectile burst
-  composeVerse('onKill',       'strike', 'spear'),   // on kill, fire a precision spear
-];
+export const DEFAULT_VERSES = buildVerses(['weinende', 'sturm', 'jaeger']);

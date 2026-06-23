@@ -12,7 +12,7 @@
 
 import { COLORS, CSS_COLORS } from '../data/design-system.js';
 import Skaldenlied from '../systems/Skaldenlied.js';
-import { DEFAULT_VERSES } from '../data/verses.js';
+import { DEFAULT_VERSES, buildVerses } from '../data/verses.js';
 import { SKALDS, DEFAULT_SKALD } from '../data/skalds.js';
 import {
   hitPause, FEEL, shakeNormal, shakeHeavy, squashStretch,
@@ -57,7 +57,11 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this._createUI();
 
     this.enemies = this.physics.add.group();
-    this.skaldenlied = new Skaldenlied(this, { verses: DEFAULT_VERSES });
+    const chosenIds = this.registry.get('chosenVerseIds');
+    this._verses = chosenIds && chosenIds.length === 3
+      ? buildVerses(chosenIds)
+      : DEFAULT_VERSES;
+    this.skaldenlied = new Skaldenlied(this, { verses: this._verses });
     this.skaldenlied.onVerseFired = (verse, active = false) => {
       this._flashVerse(verse, active);
       const color = active ? 0xFFD66B : (verse.synergy ? 0xFFD66B : 0xcc88ff);
@@ -277,7 +281,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
     bar.lineStyle(1, 0xC9A961, 0.25)
       .lineBetween(0, btnY - btnSize / 2 - 6, W, btnY - btnSize / 2 - 6);
 
-    DEFAULT_VERSES.forEach((v, i) => {
+    (this._verses || DEFAULT_VERSES).forEach((v, i) => {
       const cx = startX + i * (btnSize + btnGap);
       const stabColor = v.synergy ? 0xFFD66B : 0xcc88ff;
       this._actionButtons.push(
@@ -384,7 +388,8 @@ export default class SkaldenliedScene extends Phaser.Scene {
   }
 
   _flashVerse(verse, active = false) {
-    const idx = DEFAULT_VERSES.indexOf(verse);
+    const verses = this._verses || DEFAULT_VERSES;
+    const idx = verses.indexOf(verse);
     if (idx < 0 || !this._actionButtons[idx]) return;
     const btn = this._actionButtons[idx];
     const flashColor = active ? 0xFFD66B : btn.hex;

@@ -7,6 +7,7 @@ import GameOverScene from './scenes/GameOverScene.js';
 import SkaldenliedScene from './scenes/SkaldenliedScene.js';
 import BragiIntroScene from './scenes/BragiIntroScene.js';
 import SkaldSelectScene from './scenes/SkaldSelectScene.js';
+import VerseComposerScene from './scenes/VerseComposerScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -24,7 +25,7 @@ const config = {
     default: 'arcade',
     arcade: { gravity: { y: 0 }, debug: false }
   },
-  scene: [BootScene, MenuScene, CharacterScene, TutorialScene, DungeonScene, GameOverScene, SkaldenliedScene, BragiIntroScene, SkaldSelectScene]
+  scene: [BootScene, MenuScene, CharacterScene, TutorialScene, DungeonScene, GameOverScene, SkaldenliedScene, BragiIntroScene, SkaldSelectScene, VerseComposerScene]
 };
 
 window.game = new Phaser.Game(config);

@@ -144,7 +144,8 @@ export default class SkaldSelectScene extends Phaser.Scene {
     const out = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0).setDepth(300);
     this.tweens.add({
       targets: out, fillAlpha: 1, duration: 600,
-      onComplete: () => this.scene.start('SkaldenliedScene'),
+      onComplete: () => this.scene.start('VerseComposerScene'),
     });
   }
+
 }
