@@ -955,6 +955,70 @@ export function makeChest() {
 }
 
 // ─── Register all sprites in a Phaser scene ──────────────────────────────────
+// ─── BIOME TILE TEXTURES ──────────────────────────────────────────────────────
+export function makeTileMidgard() {
+  const c = mkCanvas(128, 128); const ctx = c.getContext('2d');
+  const tiles = [[0,0,'#111a11'],[64,0,'#141e14'],[0,64,'#141e14'],[64,64,'#111a11']];
+  tiles.forEach(([tx,ty,col]) => {
+    ctx.fillStyle = col; ctx.fillRect(tx+1, ty+1, 62, 62);
+  });
+  // Moss patches
+  ctx.fillStyle = 'rgba(28,52,25,0.75)'; ctx.fillRect(1,1,18,18); ctx.fillRect(65,65,18,18);
+  ctx.fillStyle = 'rgba(26,48,23,0.55)'; ctx.fillRect(109,5,17,17); ctx.fillRect(5,109,17,17);
+  // Grout
+  ctx.strokeStyle = '#090f09'; ctx.lineWidth = 1;
+  [[0,0],[64,0],[0,64],[64,64]].forEach(([tx,ty]) => ctx.strokeRect(tx+0.5,ty+0.5,63,63));
+  // Stone crack
+  ctx.strokeStyle = 'rgba(13,22,13,0.5)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(74,22); ctx.lineTo(110,54); ctx.stroke();
+  return c;
+}
+
+export function makeTileJotunheim() {
+  const c = mkCanvas(128, 128); const ctx = c.getContext('2d');
+  const tiles = [[0,0,'#080f1c'],[64,0,'#0e1a2c'],[0,64,'#0e1a2c'],[64,64,'#080f1c']];
+  tiles.forEach(([tx,ty,col]) => {
+    ctx.fillStyle = col; ctx.fillRect(tx+1, ty+1, 62, 62);
+  });
+  // Frost crack veins
+  ctx.strokeStyle = 'rgba(30,68,136,0.38)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(6,24); ctx.lineTo(46,56); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(84,8); ctx.lineTo(124,40); ctx.stroke();
+  ctx.strokeStyle = 'rgba(34,85,170,0.3)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(18,64+5); ctx.lineTo(58,64+42); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(64+20,64+3); ctx.lineTo(64+58,64+38); ctx.stroke();
+  // Frost corner shards
+  ctx.fillStyle = 'rgba(51,102,187,0.18)';
+  ctx.beginPath(); ctx.moveTo(1,1); ctx.lineTo(22,1); ctx.lineTo(1,22); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(65,65); ctx.lineTo(86,65); ctx.lineTo(65,86); ctx.closePath(); ctx.fill();
+  // Grout
+  ctx.strokeStyle = '#050c18'; ctx.lineWidth = 1;
+  [[0,0],[64,0],[0,64],[64,64]].forEach(([tx,ty]) => ctx.strokeRect(tx+0.5,ty+0.5,63,63));
+  return c;
+}
+
+export function makeTileHelheim() {
+  const c = mkCanvas(128, 128); const ctx = c.getContext('2d');
+  const tiles = [[0,0,'#130808'],[64,0,'#1b0d0d'],[0,64,'#1b0d0d'],[64,64,'#130808']];
+  tiles.forEach(([tx,ty,col]) => {
+    ctx.fillStyle = col; ctx.fillRect(tx+1, ty+1, 62, 62);
+  });
+  // Ash patches
+  ctx.fillStyle = 'rgba(34,16,16,0.55)'; ctx.fillRect(8,8,14,14); ctx.fillRect(80,74,12,12);
+  // Ember dots
+  ctx.fillStyle = 'rgba(204,34,0,0.18)';
+  ctx.beginPath(); ctx.arc(48,48,7,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(110,110,6,0,Math.PI*2); ctx.fill();
+  // Bone seam lines
+  ctx.strokeStyle = 'rgba(64,64,60,0.2)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(8,32); ctx.lineTo(56,36); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(72,96); ctx.lineTo(120,100); ctx.stroke();
+  // Grout
+  ctx.strokeStyle = '#0e0606'; ctx.lineWidth = 1;
+  [[0,0],[64,0],[0,64],[64,64]].forEach(([tx,ty]) => ctx.strokeRect(tx+0.5,ty+0.5,63,63));
+  return c;
+}
+
 export function registerAllSprites(scene) {
   const pairs = [
     ['krieger',      makeKrieger()],
@@ -967,6 +1031,9 @@ export function registerAllSprites(scene) {
     ['projectile',   makeProjectile()],
     ['xp_orb',       makeXpOrb()],
     ['chest',        makeChest()],
+    ['tile_midgard',    makeTileMidgard()],
+    ['tile_jotunheim',  makeTileJotunheim()],
+    ['tile_helheim',    makeTileHelheim()],
   ];
   for (const [key, canvas] of pairs) {
     if (!scene.textures.exists(key)) {

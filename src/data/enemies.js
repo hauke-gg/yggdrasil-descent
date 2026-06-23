@@ -3,10 +3,10 @@ export const ENEMIES = {
     id: 'draugr',
     name: 'Draugr',
     texture: 'enemy_draugr',
-    hp: 40,
-    speed: 90,
-    damage: 8,
-    xpReward: 15,
+    hp: 30,
+    speed: 80,
+    damage: 4,
+    xpReward: 30,
     scale: 1.0
   },
   jotunn: {
@@ -14,9 +14,9 @@ export const ENEMIES = {
     name: 'Jotunn',
     texture: 'enemy_jotunn',
     hp: 120,
-    speed: 50,
-    damage: 20,
-    xpReward: 15,
+    speed: 45,
+    damage: 10,
+    xpReward: 60,
     scale: 1.4
   },
   fenrir_wolf: {

@@ -17,7 +17,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.speed = 180;
     this.level = 1;
     this.xp = 0;
-    this.xpToNext = 60;
+    this.xpToNext = 30;
     this.kills = 0;
 
     // Waffen & Passives: [{id, level}] bzw [id]

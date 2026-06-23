@@ -14,7 +14,7 @@ import Chest from '../entities/Chest.js';
 import GodSpeechUI from '../ui/GodSpeechUI.js';
 import { WEAPONS, PASSIVES } from '../data/weapons.js';
 
-const WORLD_SIZE = 4000;
+const WORLD_SIZE = 20000;
 
 export default class DungeonScene extends Phaser.Scene {
   constructor() { super('DungeonScene'); }
@@ -30,7 +30,7 @@ export default class DungeonScene extends Phaser.Scene {
 
     this._survivalSeconds = 0;
     this._waveLevel = 0;
-    this._spawnInterval = 3000;
+    this._spawnInterval = 4500;
     this._nextSpawnTime = 0;
     this._spawnGrace = true;
     this._levelUpPending = false;
@@ -49,108 +49,18 @@ export default class DungeonScene extends Phaser.Scene {
   }
 
   _drawWorld() {
-    const g = this.add.graphics().setDepth(-3);
     const cx = WORLD_SIZE / 2, cy = WORLD_SIZE / 2;
+    const W = this.scale.width, H = this.scale.height;
 
-    // Outer void
-    g.fillStyle(0x020104, 1);
-    g.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
-
-    // Biome base fills (behind tiles)
-    g.fillStyle(0x130a0a, 1); // Helheim base: blood ash
-    g.fillCircle(cx, cy, 2100);
-    g.fillStyle(0x060c16, 1); // Jötunheim base: deep ice navy
-    g.fillCircle(cx, cy, 1600);
-    g.fillStyle(0x0a140a, 1); // Midgard base: dark forest
-    g.fillCircle(cx, cy, 800);
-
-    // --- TILE LAYER ---
-    const tileG = this.add.graphics().setDepth(-2);
-    const TILE = 64;
-    for (let tx = 0; tx < WORLD_SIZE; tx += TILE) {
-      for (let ty = 0; ty < WORLD_SIZE; ty += TILE) {
-        const dx = tx + TILE / 2 - cx;
-        const dy = ty + TILE / 2 - cy;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > 2080) continue;
-
-        const h1 = (tx * 7 + ty * 13) % 100;
-        const h2 = (tx * 11 + ty * 19) % 100;
-
-        if (dist < 800) {
-          // MIDGARD: dark green mossy stone
-          const shade = h1 < 25 ? 0x111a11 : h1 < 60 ? 0x141e14 : 0x182218;
-          tileG.fillStyle(shade, 1);
-          tileG.fillRect(tx + 1, ty + 1, TILE - 2, TILE - 2);
-          // Moss patches in tile corners
-          if (h1 < 14) {
-            tileG.fillStyle(0x1c3419, 0.75);
-            tileG.fillRect(tx + 1, ty + 1, 18, 18);
-          }
-          if (h2 < 10) {
-            tileG.fillStyle(0x1a3017, 0.6);
-            tileG.fillRect(tx + TILE - 19, ty + TILE - 19, 18, 18);
-          }
-          // Green grout
-          tileG.lineStyle(1, 0x090f09, 0.9);
-          tileG.strokeRect(tx + 1, ty + 1, TILE - 2, TILE - 2);
-          // Stone crack on some tiles
-          if (h1 > 90) {
-            tileG.lineStyle(1, 0x0d160d, 0.55);
-            tileG.lineBetween(tx + 10, ty + 22, tx + 42, ty + 52);
-          }
-          // Faint rune shimmer near altar
-          if (h1 < 5 && dist < 560) {
-            tileG.fillStyle(0x33cc55, 0.05);
-            tileG.fillRect(tx, ty, TILE, TILE);
-          }
-        } else if (dist < 1600) {
-          // JÖTUNHEIM: ice-blue crystalline
-          const shade = h1 < 25 ? 0x080f1c : h1 < 60 ? 0x0b1422 : 0x0e1a2c;
-          tileG.fillStyle(shade, 1);
-          tileG.fillRect(tx + 1, ty + 1, TILE - 2, TILE - 2);
-          // Frost crack veins
-          if (h1 < 22) {
-            tileG.lineStyle(1, 0x1e4488, 0.38);
-            tileG.lineBetween(tx + 6, ty + TILE * 0.38, tx + TILE * 0.72, ty + TILE - 6);
-          }
-          if (h2 < 16) {
-            tileG.lineStyle(1, 0x2255aa, 0.3);
-            tileG.lineBetween(tx + TILE * 0.28, ty + 5, tx + TILE - 6, ty + TILE * 0.62);
-          }
-          // Frost corner shard
-          if (h1 > 86) {
-            tileG.fillStyle(0x3366bb, 0.18);
-            tileG.fillTriangle(tx + 1, ty + 1, tx + 22, ty + 1, tx + 1, ty + 22);
-          }
-          // Ice grout
-          tileG.lineStyle(1, 0x050c18, 0.9);
-          tileG.strokeRect(tx + 1, ty + 1, TILE - 2, TILE - 2);
-        } else {
-          // HELHEIM: dark ash red bone
-          const shade = h1 < 25 ? 0x130808 : h1 < 60 ? 0x170b0b : 0x1b0d0d;
-          tileG.fillStyle(shade, 1);
-          tileG.fillRect(tx + 1, ty + 1, TILE - 2, TILE - 2);
-          // Ash patch
-          if (h1 < 18) {
-            tileG.fillStyle(0x221010, 0.55);
-            tileG.fillRect(tx + (h1 % 36), ty + (h2 % 36), 14, 14);
-          }
-          // Ember glow on tile surface
-          if (h1 > 93) {
-            tileG.fillStyle(0xcc2200, 0.14);
-            tileG.fillCircle(tx + TILE / 2, ty + TILE / 2, 9);
-          }
-          // Bone-gray seam
-          tileG.lineStyle(1, 0x0e0606, 0.9);
-          tileG.strokeRect(tx + 1, ty + 1, TILE - 2, TILE - 2);
-          if (h2 > 89) {
-            tileG.lineStyle(1, 0x404040, 0.18);
-            tileG.lineBetween(tx + 8, ty + 32, tx + 56, ty + 40);
-          }
-        }
-      }
-    }
+    // --- INFINITE TILE BACKGROUNDS (camera-fixed TileSprites) ---
+    // setScrollFactor(0) pins them to screen; tilePosition updated each frame
+    // to create the illusion of an infinite scrolling world floor.
+    this._bgMidgard = this.add.tileSprite(0, 0, W, H, 'tile_midgard')
+      .setScrollFactor(0).setOrigin(0, 0).setDepth(-5).setAlpha(1);
+    this._bgJotunheim = this.add.tileSprite(0, 0, W, H, 'tile_jotunheim')
+      .setScrollFactor(0).setOrigin(0, 0).setDepth(-4).setAlpha(0);
+    this._bgHelheim = this.add.tileSprite(0, 0, W, H, 'tile_helheim')
+      .setScrollFactor(0).setOrigin(0, 0).setDepth(-3).setAlpha(0);
 
     // --- DECORATIONS ---
     const decoG = this.add.graphics().setDepth(-1);
@@ -286,8 +196,9 @@ export default class DungeonScene extends Phaser.Scene {
   }
 
   _createPlayer() {
-    this._player = new Player(this, 2000, 2000, this._playerClass);
-    this._player.setCollideWorldBounds(true);
+    const cx = WORLD_SIZE / 2;
+    this._player = new Player(this, cx, cx, this._playerClass);
+    this._player.setCollideWorldBounds(false);
   }
 
   _applyClassStats() {
@@ -377,15 +288,14 @@ export default class DungeonScene extends Phaser.Scene {
   }
 
   _spawnInitialEnemies() {
-    // Single Draugr far enough to give player 2s to orient
-    this.time.delayedCall(2000, () => {
+    const cx = WORLD_SIZE / 2;
+    this.time.delayedCall(4000, () => {
       const angle = Math.random() * Math.PI * 2;
-      const x = 2000 + Math.cos(angle) * 420;
-      const y = 2000 + Math.sin(angle) * 420;
+      const x = cx + Math.cos(angle) * 620;
+      const y = cx + Math.sin(angle) * 620;
       const stats = this._waveSystem.getEnemyStats('draugr', 1);
       const enemy = new Draugr(this, x, y, stats);
       this._enemies.add(enemy);
-      // Lift grace period so wave spawning begins
       this._spawnGrace = false;
     });
   }
@@ -441,8 +351,9 @@ export default class DungeonScene extends Phaser.Scene {
   }
 
   _getBiomeName() {
-    const dx = this._player.x - 2000;
-    const dy = this._player.y - 2000;
+    const cx = WORLD_SIZE / 2;
+    const dx = this._player.x - cx;
+    const dy = this._player.y - cx;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < 800) return 'Midgard';
     if (dist < 1600) return 'Jötunheim';
@@ -458,6 +369,18 @@ export default class DungeonScene extends Phaser.Scene {
     this._weaponSystem.update(time);
 
     this._enemies.getChildren().forEach(e => e.update(this._player));
+
+    // Scroll tile backgrounds with camera for infinite-world effect
+    const cam = this.cameras.main;
+    if (this._bgMidgard) {
+      this._bgMidgard.setTilePosition(cam.scrollX, cam.scrollY);
+      this._bgJotunheim.setTilePosition(cam.scrollX, cam.scrollY);
+      this._bgHelheim.setTilePosition(cam.scrollX, cam.scrollY);
+      const cx = WORLD_SIZE / 2;
+      const dist = Math.hypot(this._player.x - cx, this._player.y - cx);
+      this._bgJotunheim.setAlpha(Phaser.Math.Clamp((dist - 700) / 300, 0, 1));
+      this._bgHelheim.setAlpha(Phaser.Math.Clamp((dist - 1400) / 400, 0, 1));
+    }
 
     this._hud.update(this._player, this._survivalSeconds, this._getBiomeName());
 
@@ -503,8 +426,8 @@ export default class DungeonScene extends Phaser.Scene {
     for (let i = 0; i < count; i++) {
       const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
       const dist = 300 + Math.random() * 1200;
-      const cx = this._player ? this._player.x : 2000;
-      const cy = this._player ? this._player.y : 2000;
+      const cx = this._player ? this._player.x : WORLD_SIZE / 2;
+      const cy = this._player ? this._player.y : WORLD_SIZE / 2;
       const x = Phaser.Math.Clamp(cx + Math.cos(angle) * dist, 50, WORLD_SIZE - 50);
       const y = Phaser.Math.Clamp(cy + Math.sin(angle) * dist, 50, WORLD_SIZE - 50);
       this._chests.push(new Chest(this, x, y));
