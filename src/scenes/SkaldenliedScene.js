@@ -14,6 +14,7 @@ import { COLORS, CSS_COLORS } from '../data/design-system.js';
 import Skaldenlied from '../systems/Skaldenlied.js';
 import { DEFAULT_VERSES, buildVerses } from '../data/verses.js';
 import { SKALDS, DEFAULT_SKALD } from '../data/skalds.js';
+import { GODS, BOON_LIBRARY, rollBoonChoice } from '../data/boons.js';
 import {
   hitPause, FEEL, shakeNormal, shakeHeavy, squashStretch,
   damagePopup, hitBurst, slowMo, critPunch,
@@ -588,6 +589,153 @@ export default class SkaldenliedScene extends Phaser.Scene {
     }
   }
 
+  _presentBoonChoice(godId) {
+    if (this._boonActive) return;
+    this._boonActive = true;
+    this.physics.pause();
+    audio.bossHorn();
+
+    const god = GODS[godId] || GODS.loki;
+    const W = this.scale.width, H = this.scale.height;
+    const layer = this.add.container(0, 0).setDepth(220).setScrollFactor(0);
+
+    const ov = this.add.graphics();
+    ov.fillStyle(0x000000, 0).fillRect(0, 0, W, H);
+    layer.add(ov);
+    this.tweens.add({ targets: ov, fillAlpha: 0.78, duration: 600 });
+
+    // God portrait left
+    let portrait = null;
+    if (this.textures.exists(god.portrait)) {
+      portrait = this.add.image(W * 0.25, H * 0.5, god.portrait)
+        .setDisplaySize(H * 0.7, H * 0.7).setAlpha(0);
+      layer.add(portrait);
+      this.tweens.add({ targets: portrait, alpha: 1, duration: 900, delay: 200 });
+    }
+
+    // God name + monologue right
+    const name = this.add.text(W * 0.58, H * 0.18, god.name, {
+      fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '38px',
+      color: god.color, fontStyle: 'bold', letterSpacing: 8,
+      stroke: '#000', strokeThickness: 4,
+    }).setOrigin(0, 0).setAlpha(0);
+    layer.add(name);
+    this.tweens.add({ targets: name, alpha: 1, duration: 700, delay: 600 });
+
+    const title = this.add.text(W * 0.58, H * 0.27, god.title, {
+      fontFamily: "'Lora', serif", fontSize: '14px', fontStyle: 'italic',
+      color: '#a89888',
+    }).setOrigin(0, 0).setAlpha(0);
+    layer.add(title);
+    this.tweens.add({ targets: title, alpha: 1, duration: 700, delay: 900 });
+
+    const mono = this.add.text(W * 0.58, H * 0.34, '„' + god.monologue + '"', {
+      fontFamily: "'Lora', serif", fontSize: '15px',
+      color: '#e8dcc0', wordWrap: { width: W * 0.36 },
+      lineSpacing: 4, fontStyle: 'italic',
+    }).setOrigin(0, 0).setAlpha(0);
+    layer.add(mono);
+    this.tweens.add({ targets: mono, alpha: 1, duration: 800, delay: 1300 });
+
+    // 3 boon cards
+    const choices = rollBoonChoice(god.id);
+    const cw = 200, ch = 130, cgap = 16;
+    const cardsTotalW = 3 * cw + 2 * cgap;
+    const cardsStartX = W * 0.58 + cardsTotalW / 6 - cardsTotalW / 2 + cw / 2;
+    const cardsY = H * 0.66;
+
+    choices.forEach((boon, i) => {
+      const cx = W * 0.58 + (cardsTotalW / 2) - cardsTotalW + i * (cw + cgap) + cw / 2;
+      const ry = cardsY - ch / 2;
+      const rx = cx - cw / 2;
+      const bg = this.add.graphics();
+      const draw = (hover) => {
+        bg.clear();
+        bg.fillStyle(hover ? 0x1A0F2A : 0x0E0A18, 0.95)
+          .fillRoundedRect(rx, ry, cw, ch, 8);
+        bg.lineStyle(hover ? 3 : 2, hover ? Phaser.Display.Color.HexStringToColor(god.color).color : 0x4a3a5e, hover ? 0.95 : 0.8)
+          .strokeRoundedRect(rx, ry, cw, ch, 8);
+      };
+      draw(false);
+      const cardName = this.add.text(cx, ry + 18, boon.name, {
+        fontFamily: "'Cinzel', serif", fontSize: '14px', fontStyle: 'bold',
+        color: god.color, align: 'center', wordWrap: { width: cw - 16 },
+      }).setOrigin(0.5, 0);
+      const cardDesc = this.add.text(cx, ry + 56, boon.description, {
+        fontFamily: "'Lora', serif", fontSize: '11px',
+        color: '#cdb8a8', align: 'center', wordWrap: { width: cw - 20 },
+        lineSpacing: 2,
+      }).setOrigin(0.5, 0);
+      const hit = this.add.rectangle(cx, cardsY, cw, ch, 0x000000, 0)
+        .setInteractive({ useHandCursor: true });
+
+      hit.on('pointerover', () => draw(true));
+      hit.on('pointerout', () => draw(false));
+      hit.on('pointerdown', () => this._chooseBoon(boon, layer));
+
+      layer.add([bg, cardName, cardDesc, hit]);
+      [bg, cardName, cardDesc].forEach(o => o.setAlpha(0));
+      this.tweens.add({ targets: [bg, cardName, cardDesc], alpha: 1, duration: 500, delay: 1700 + i * 200 });
+    });
+
+    this._boonLayer = layer;
+  }
+
+  _chooseBoon(boon, layer) {
+    if (!this._boonActive) return;
+    this._boonState = this._boonState || {
+      dmgMult: 1, spdMult: 1, cdMult: 1, swirlCdMult: 1, swirlDmgMult: 1,
+      maxHpMult: 1, comboDecayMult: 1, comboCap: 3.0,
+      critBonus: 0, healOnCrit: 0,
+    };
+    boon.apply(this._boonState);
+    this._applyBoonStateToPlayer();
+    // Fade overlay
+    this.tweens.add({
+      targets: layer.list,
+      alpha: 0, duration: 500,
+      onComplete: () => {
+        layer.destroy();
+        this.physics.resume();
+        this._boonActive = false;
+      },
+    });
+    // Visual flash on player
+    const ring = this.add.circle(this.player.x, this.player.y, 12, 0xFFD66B, 0)
+      .setStrokeStyle(3, 0xFFD66B, 1).setDepth(28);
+    this.tweens.add({
+      targets: ring, radius: 120, alpha: 0,
+      duration: 700, ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
+    });
+  }
+
+  _applyBoonStateToPlayer() {
+    const s = this._boonState;
+    if (!s || !this.player) return;
+    // Speed
+    this.player.speed = (this._skaldProfile?.stats?.spd || 220) * s.spdMult;
+    // Max HP
+    const baseMax = this._skaldProfile?.stats?.hp || 100;
+    const newMax = Math.round(baseMax * s.maxHpMult + (s.maxHpBonus || 0));
+    const ratio = this.player.hp / this.player.maxHp;
+    this.player.maxHp = newMax;
+    this.player.hp = Math.min(newMax, Math.round(newMax * ratio + (s.healOnApply || 0)));
+    s.healOnApply = 0;
+    // Damage multiplier — kept on the scene, applied in damage flow
+    this._dmgBoonMult = s.dmgMult;
+    // Cooldown multiplier — applied to Skaldenlied
+    if (this.skaldenlied) {
+      this.skaldenlied._activeCdMs = this.skaldenlied._activeCdMs.map(
+        cd => Math.round(cd * (s.cdMult / (this._lastCdMult || 1)))
+      );
+      this._lastCdMult = s.cdMult;
+      // Combo cap + decay
+      this.skaldenlied.comboCap = s.comboCap;
+      this.skaldenlied._comboDecayDelay = 2000 / (s.comboDecayMult || 1);
+    }
+  }
+
   _showOnboarding() {
     const W = this.scale.width, H = this.scale.height;
     const ov = this.add.graphics().setDepth(180).setScrollFactor(0);
@@ -884,8 +1032,17 @@ export default class SkaldenliedScene extends Phaser.Scene {
 
   damageEnemy(e, dmg, srcX, srcY) {
     if (!e || !e.active) return;
-    const crit = Math.random() < 0.18;
-    const finalDmg = crit ? dmg * 2 : dmg;
+    const boonMult = this._dmgBoonMult || 1;
+    const critBonus = this._boonState?.critBonus || 0;
+    const crit = Math.random() < (0.18 + critBonus);
+    const baseDmg = dmg * boonMult;
+    const finalDmg = crit ? baseDmg * 2 : baseDmg;
+    if (crit) {
+      const healOnCrit = this._boonState?.healOnCrit || 0;
+      if (healOnCrit > 0 && this.player.hp > 0) {
+        this.player.hp = Math.min(this.player.maxHp, this.player.hp + healOnCrit);
+      }
+    }
     e.hp -= finalDmg;
     audio.hitLight();
     damagePopup(this, e.x, e.y - 22, Math.floor(finalDmg), crit);
@@ -915,6 +1072,8 @@ export default class SkaldenliedScene extends Phaser.Scene {
         audio.bossDeath();
         shakeHeavy(this);
         hitPause(this, FEEL.HIT_PAUSE_CRIT * 2);
+        // Trigger Loki boon choice after the show finishes
+        this.time.delayedCall(2200, () => this._presentBoonChoice('loki'));
         // Massive particle burst
         for (let i = 0; i < 30; i++) {
           const angle = (i / 30) * Math.PI * 2;

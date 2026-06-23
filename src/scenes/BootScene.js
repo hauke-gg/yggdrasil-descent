@@ -14,6 +14,7 @@ export default class BootScene extends Phaser.Scene {
     this.load.image('enemy_skinwalker', 'assets/enemy-skinwalker.png');
     this.load.image('enemy_fenrir', 'assets/enemy-fenrir.jpg');
     this.load.image('enemy_jotunn', 'assets/enemy-jotunn.jpg');
+    this.load.image('god_loki_img', 'assets/god-loki.jpg');
   }
 
   create() {
