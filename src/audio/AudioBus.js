@@ -181,6 +181,76 @@ class AudioBus {
     if (this._combat) { clearInterval(this._combat); this._combat = null; }
   }
 
+  /**
+   * Ambient Wardruna-style drone — sustained, slow, atmospheric.
+   * Layered with combat pulse for fuller texture during gameplay.
+   */
+  startAmbientDrone() {
+    if (!this._unlocked || this._ambient) return;
+    const t = this._now();
+    const root = 65.41;        // low C2
+    const fifth = root * 1.5;
+    const oct  = root * 2;
+
+    const o1 = this.ctx.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = root;
+    const o2 = this.ctx.createOscillator(); o2.type = 'sawtooth'; o2.frequency.value = root * 1.008;
+    const o3 = this.ctx.createOscillator(); o3.type = 'triangle'; o3.frequency.value = oct;
+    const o4 = this.ctx.createOscillator(); o4.type = 'sine';     o4.frequency.value = fifth;
+
+    // Slow LFO on the fifth — gives it the breath of a sustained vocal
+    const lfo = this.ctx.createOscillator();
+    const lfoGain = this.ctx.createGain();
+    lfo.frequency.value = 0.07;
+    lfoGain.gain.value = 0.6;
+    lfo.connect(lfoGain);
+    lfoGain.connect(o4.frequency);
+
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 380;
+
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.18, t + 4.0);
+
+    o1.connect(lp); o2.connect(lp); o3.connect(lp); o4.connect(lp);
+    lp.connect(g); g.connect(this.musicGain);
+    o1.start(t); o2.start(t); o3.start(t); o4.start(t); lfo.start(t);
+
+    this._ambient = { osc: [o1, o2, o3, o4, lfo], gain: g };
+  }
+
+  stopAmbientDrone() {
+    if (!this._ambient) return;
+    const t = this._now();
+    this._ambient.gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+    setTimeout(() => {
+      try { this._ambient.osc.forEach(o => o.stop()); } catch {}
+      this._ambient = null;
+    }, 2000);
+  }
+
+  /**
+   * Boss-appearance horn — long, low, dread-inducing.
+   */
+  bossHorn() {
+    if (!this._unlocked) return;
+    const t = this._now();
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(45, t);
+    osc.frequency.exponentialRampToValueAtTime(70, t + 0.6);
+    osc.frequency.exponentialRampToValueAtTime(40, t + 1.4);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.45, t + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 800;
+    osc.connect(lp); lp.connect(g); g.connect(this.sfxGain);
+    osc.start(t); osc.stop(t + 1.7);
+  }
+
   _frameDrum() {
     if (!this._unlocked) return;
     const t = this._now();

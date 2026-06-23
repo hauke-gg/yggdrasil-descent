@@ -138,7 +138,7 @@ export default class MenuScene extends Phaser.Scene {
       protoLabel.setColor('#C9C4D1');
     });
     protoHit.on('pointerdown', () => {
-      this.scene.start('SkaldenliedScene');
+      this.scene.start('BragiIntroScene');
     });
 
     this.add.text(cx, protoY + protoH + 8, 'Sprint 1 — Hook-Test', {

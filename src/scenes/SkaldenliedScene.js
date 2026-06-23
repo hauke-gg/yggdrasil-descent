@@ -18,7 +18,8 @@ import {
   damagePopup, hitBurst, slowMo, critPunch,
 } from '../utils/GameFeel.js';
 import {
-  createSkaldTexture, createDraugrTexture, drawWurzelkammerFloor,
+  createSkaldTexture, createDraugrTexture, createDraugrWarriorTexture,
+  createDraugrKingTexture, drawWurzelkammerFloor,
   spawnMist, spawnLightShaft, drawVignette, drawNorseOrnament,
   playVerseTriggerFx,
 } from '../utils/SkaldenliedArt.js';
@@ -34,10 +35,14 @@ export default class SkaldenliedScene extends Phaser.Scene {
     if (!this.textures.exists('wurzelkammer_bg')) {
       this.load.image('wurzelkammer_bg', 'assets/wurzelkammer-bg.png');
     }
+    if (!this.textures.exists('draugr_king_img')) {
+      this.load.image('draugr_king_img', 'assets/draugr-king.png');
+    }
   }
 
   create() {
     audio.unlock();
+    audio.startAmbientDrone();
     audio.startCombatPulse();
 
     this.physics.world.setBounds(0, 0, ROOM_W, ROOM_H);
@@ -68,9 +73,13 @@ export default class SkaldenliedScene extends Phaser.Scene {
       callback: () => this._spawnDraugr(),
     });
 
-    // Killcounter for slow-mo trigger
+    // Wave + killcounter
     this._killsThisWave = 0;
     this._waveSize = 6;
+    this._waveIndex = 1;
+    this._totalKills = 0;
+    this._bossPending = false;
+    this._bossActive = false;
 
     // Projectile-enemy overlap
     this.physics.world.on('worldstep', () => this._updateProjectiles());
@@ -318,23 +327,100 @@ export default class SkaldenliedScene extends Phaser.Scene {
   }
 
   _spawnDraugr() {
+    if (this._bossActive) return;
+    if (this._bossPending) {
+      this._spawnDraugrKing();
+      return;
+    }
     const corner = Phaser.Math.RND.pick(this._spawnCorners);
     const offset = 40;
     const ox = corner.x + (Math.random() - 0.5) * offset;
     const oy = corner.y + (Math.random() - 0.5) * offset;
 
-    const key = createDraugrTexture(this);
+    // Wave 3+: 30% chance for warrior; wave 5+: 50%
+    const warriorChance = this._waveIndex >= 5 ? 0.5 : this._waveIndex >= 3 ? 0.3 : 0;
+    if (Math.random() < warriorChance) {
+      const key = createDraugrWarriorTexture(this);
+      const e = this.physics.add.sprite(ox, oy, key);
+      e.setCircle(16, 32, 30);
+      e.hp = 64;
+      e.maxHp = 64;
+      e.damage = 16;
+      e.speed = 55 + Math.random() * 20;
+      e.speedMult = 1;
+      e.setDepth(18);
+      e.lastTouchAt = 0;
+      e.kind = 'warrior';
+      this.enemies.add(e);
+      return;
+    }
 
+    const key = createDraugrTexture(this);
     const e = this.physics.add.sprite(ox, oy, key);
     e.setCircle(14, 26, 22);
-    e.hp = 28;
-    e.maxHp = 28;
-    e.damage = 8;
-    e.speed = 80 + Math.random() * 30;
+    const waveScale = 1 + (this._waveIndex - 1) * 0.15;
+    e.hp = Math.round(28 * waveScale);
+    e.maxHp = e.hp;
+    e.damage = Math.round(8 * waveScale);
+    e.speed = 80 + Math.random() * 30 + this._waveIndex * 4;
     e.speedMult = 1;
     e.setDepth(18);
     e.lastTouchAt = 0;
+    e.kind = 'draugr';
     this.enemies.add(e);
+  }
+
+  _spawnDraugrKing() {
+    this._bossPending = false;
+    this._bossActive = true;
+    audio.bossHorn();
+    shakeHeavy(this);
+
+    // Use the Higgsfield-painted king if loaded, fallback procedural
+    const key = this.textures.exists('draugr_king_img') ? 'draugr_king_img' : createDraugrKingTexture(this);
+    const ox = ROOM_W / 2;
+    const oy = 200;
+    const e = this.physics.add.sprite(ox, oy, key);
+    if (key === 'draugr_king_img') {
+      e.setScale(0.18);
+      e.setCircle(180, 332, 380);
+    } else {
+      e.setCircle(22, 42, 50);
+    }
+    e.hp = 320;
+    e.maxHp = 320;
+    e.damage = 24;
+    e.speed = 70;
+    e.speedMult = 1;
+    e.setDepth(19);
+    e.lastTouchAt = 0;
+    e.kind = 'king';
+    this.enemies.add(e);
+    this._kingRef = e;
+
+    // Boss-name banner
+    const W = this.scale.width, H = this.scale.height;
+    const banner = this.add.text(W / 2, H / 2 - 40, 'DRAUGR-KÖNIG ERWACHT', {
+      fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '36px',
+      color: '#FF3322', fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 4,
+      shadow: { offsetX: 0, offsetY: 0, color: '#ff3322', blur: 16, fill: true },
+    }).setOrigin(0.5).setDepth(150).setScrollFactor(0).setAlpha(0);
+    const sub = this.add.text(W / 2, H / 2 + 4, 'Sieger über sieben Skalden vor dir', {
+      fontFamily: "'Lora', serif", fontSize: '13px',
+      color: '#cc88ff', fontStyle: 'italic',
+    }).setOrigin(0.5).setDepth(150).setScrollFactor(0).setAlpha(0);
+    this.tweens.add({
+      targets: [banner, sub], alpha: 1, duration: 600,
+      onComplete: () => {
+        this.time.delayedCall(2200, () => {
+          this.tweens.add({
+            targets: [banner, sub], alpha: 0, duration: 800,
+            onComplete: () => { banner.destroy(); sub.destroy(); },
+          });
+        });
+      },
+    });
   }
 
   _updateEnemies(delta) {
@@ -399,19 +485,57 @@ export default class SkaldenliedScene extends Phaser.Scene {
     if (crit) critPunch(this);
     hitBurst(this, e.x, e.y, (e.x - (srcX || e.x)), (e.y - (srcY || e.y)), 0xff8844);
     if (e.hp <= 0) {
+      const wasBoss = e.kind === 'king';
       this._killsThisWave++;
       this._totalKills = (this._totalKills || 0) + 1;
       this._killText.setText(`${this._totalKills} Gefallen`);
       this.skaldenlied.onEnemyKilled(e);
       audio.pickup();
-      // Slow-mo on last-of-wave
-      if (this._killsThisWave >= this._waveSize) {
-        this._killsThisWave = 0;
-        this._waveSize += 2;
+
+      if (wasBoss) {
+        this._bossActive = false;
+        this._kingRef = null;
         slowMo(this);
         audio.bossDeath();
         shakeHeavy(this);
+        hitPause(this, FEEL.HIT_PAUSE_CRIT * 2);
+        // Massive particle burst
+        for (let i = 0; i < 30; i++) {
+          const angle = (i / 30) * Math.PI * 2;
+          hitBurst(this, e.x, e.y, Math.cos(angle) * 50, Math.sin(angle) * 50, 0xFFB45A);
+        }
+        // Show royal-down banner
+        const W = this.scale.width, H = this.scale.height;
+        const banner = this.add.text(W / 2, H / 2, 'KÖNIG GEFALLEN', {
+          fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '40px',
+          color: '#FFD66B', fontStyle: 'bold',
+          stroke: '#000', strokeThickness: 4,
+          shadow: { offsetX: 0, offsetY: 0, color: '#FFB45A', blur: 18, fill: true },
+        }).setOrigin(0.5).setDepth(150).setScrollFactor(0).setAlpha(0);
+        this.tweens.add({
+          targets: banner, alpha: 1, duration: 400,
+          onComplete: () => {
+            this.time.delayedCall(2200, () => {
+              this.tweens.add({ targets: banner, alpha: 0, duration: 600, onComplete: () => banner.destroy() });
+            });
+          },
+        });
+        // Advance wave significantly
+        this._waveIndex += 1;
+        this._killsThisWave = 0;
+        this._waveSize = 8 + this._waveIndex * 2;
+      } else if (this._killsThisWave >= this._waveSize) {
+        // End of regular wave
+        this._waveIndex += 1;
+        this._killsThisWave = 0;
+        this._waveSize += 2;
+        slowMo(this);
+        shakeHeavy(this);
         hitPause(this, FEEL.HIT_PAUSE_CRIT);
+        // Trigger boss at wave 5
+        if (this._waveIndex === 5 && !this._bossActive) {
+          this._bossPending = true;
+        }
       }
       e.destroy();
     } else {
@@ -421,28 +545,84 @@ export default class SkaldenliedScene extends Phaser.Scene {
 
   _gameOver() {
     audio.stopCombatPulse();
+    audio.stopAmbientDrone();
     const W = this.scale.width, H = this.scale.height;
-    const overlay = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.85)
+
+    // Dim overlay with slow fade-in
+    const overlay = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0)
       .setDepth(200).setScrollFactor(0);
-    this.add.text(W / 2, H / 2 - 30, 'Du bist gefallen.', {
-      fontFamily: "'Cinzel', serif", fontSize: '32px',
-      color: CSS_COLORS.goldLight, stroke: '#000', strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(201).setScrollFactor(0);
-    this.add.text(W / 2, H / 2 + 10, `${this._totalKills || 0} Draugr fielen mit dir.`, {
-      fontFamily: "'Lora', serif", fontSize: '14px',
-      color: '#a89888',
-    }).setOrigin(0.5).setDepth(201).setScrollFactor(0);
-    this.add.text(W / 2, H / 2 + 60, 'ENTER für einen neuen Vers · ESC für Menü', {
+    this.tweens.add({ targets: overlay, fillAlpha: 0.88, duration: 1200 });
+
+    // Mímir-foreshadowing line — pulled from a small pool by run
+    const mimirLines = [
+      '„Der siebte Skalde fällt. Bald wird der achte gewoben."',
+      '„Du dachtest, du wärst der Erste. Vier Knochen vor dir trugen deinen Namen."',
+      '„Mímir trinkt aus seinem Brunnen und lächelt. Es geht voran."',
+      '„Eine Norne webt ein neues Garn. Es trägt schon deine Farbe."',
+      '„Sie sagten dir, du wärst gewählt. Sie logen, weil es freundlich klang."',
+    ];
+    const line = mimirLines[(this._totalKills || 0) % mimirLines.length];
+
+    // Bragi memo strophe
+    const memo =
+      'Hörnerklang aus Helheim hallt,\n' +
+      'Skalde sank, sein Lied verstummte.\n' +
+      'Sieben Söhne sanken sanft —\n' +
+      'Wer ist nun der Achte, der?';
+
+    const fallenTitle = this.add.text(W / 2, H * 0.22, 'DU BIST GEFALLEN', {
+      fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '34px',
+      color: '#FFD66B', fontStyle: 'bold', stroke: '#000', strokeThickness: 3,
+      shadow: { offsetX: 0, offsetY: 0, color: '#FFB45A', blur: 12, fill: true },
+    }).setOrigin(0.5).setDepth(201).setScrollFactor(0).setAlpha(0);
+
+    // Stats line
+    const stats = this.add.text(
+      W / 2, H * 0.30,
+      `Welle ${this._waveIndex || 1}   ·   ${this._totalKills || 0} Gefallen`,
+      { fontFamily: "'Space Mono', monospace", fontSize: '13px', color: '#a89888' }
+    ).setOrigin(0.5).setDepth(201).setScrollFactor(0).setAlpha(0);
+
+    // Mímir's voice
+    const mimirVoice = this.add.text(W / 2, H * 0.46, line, {
+      fontFamily: "'Lora', serif", fontSize: '17px', fontStyle: 'italic',
+      color: '#cc88ff', align: 'center', wordWrap: { width: W * 0.7 },
+      lineSpacing: 6,
+    }).setOrigin(0.5).setDepth(201).setScrollFactor(0).setAlpha(0);
+
+    const memoLine = this.add.text(W / 2, H * 0.66, memo, {
+      fontFamily: "'Cinzel', serif", fontSize: '12px', color: '#7a7080',
+      align: 'center', lineSpacing: 8,
+    }).setOrigin(0.5).setDepth(201).setScrollFactor(0).setAlpha(0);
+
+    const hint = this.add.text(W / 2, H * 0.88,
+      '↵ ENTER — Steige erneut hinab        ESC — Verlasse den Brunnen', {
       fontFamily: "'Space Mono', monospace", fontSize: '11px',
-      color: CSS_COLORS.purpleLight,
-    }).setOrigin(0.5).setDepth(201).setScrollFactor(0);
+      color: '#5a4a6a', letterSpacing: 2,
+    }).setOrigin(0.5).setDepth(201).setScrollFactor(0).setAlpha(0);
+
+    // Sequence the reveal
+    const tlOpts = (target, delay) => ({
+      targets: target, alpha: 1, duration: 900, delay, ease: 'Cubic.easeOut',
+    });
+    this.tweens.add(tlOpts(fallenTitle, 600));
+    this.tweens.add(tlOpts(stats, 1200));
+    this.tweens.add(tlOpts(mimirVoice, 2200));
+    this.tweens.add(tlOpts(memoLine, 3400));
+    this.tweens.add(tlOpts(hint, 4400));
+
     this.input.keyboard.once('keydown-ENTER', () => this.scene.restart());
   }
 
   _returnToMenu() {
     audio.stopCombatPulse();
+    audio.stopAmbientDrone();
     this.scene.start('MenuScene');
   }
 
-  shutdown() { audio.stopCombatPulse(); this.skaldenlied?.destroy(); }
+  shutdown() {
+    audio.stopCombatPulse();
+    audio.stopAmbientDrone();
+    this.skaldenlied?.destroy();
+  }
 }

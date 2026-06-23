@@ -154,6 +154,289 @@ export function createSkaldTexture(scene, key = 'skald_sprite') {
 }
 
 /**
+ * Painterly draugr-warrior — tall draugr with sword and shoulder plate.
+ * Slower, tankier variant. 96×96 canvas.
+ */
+export function createDraugrWarriorTexture(scene, key = 'draugr_warrior_sprite') {
+  if (scene.textures.exists(key)) return key;
+  const size = 96;
+  const tex = scene.textures.createCanvas(key, size, size);
+  const ctx = tex.getContext();
+
+  // Drop shadow
+  ctx.save();
+  const sh = ctx.createRadialGradient(48, 86, 0, 48, 86, 26);
+  sh.addColorStop(0, 'rgba(0,0,0,0.65)');
+  sh.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = sh;
+  ctx.fillRect(18, 78, 60, 16);
+  ctx.restore();
+
+  // Body — tall hulking silhouette
+  ctx.save();
+  const bodyGrad = ctx.createLinearGradient(0, 24, 0, 82);
+  bodyGrad.addColorStop(0, '#3A2E48');
+  bodyGrad.addColorStop(0.6, '#251E36');
+  bodyGrad.addColorStop(1, '#0E0818');
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.moveTo(48, 26);
+  ctx.bezierCurveTo(32, 30, 26, 42, 26, 58);
+  ctx.bezierCurveTo(24, 70, 30, 80, 36, 82);
+  ctx.lineTo(40, 76);
+  ctx.lineTo(44, 82);
+  ctx.lineTo(48, 74);
+  ctx.lineTo(52, 82);
+  ctx.lineTo(56, 76);
+  ctx.lineTo(60, 82);
+  ctx.bezierCurveTo(66, 80, 72, 70, 70, 58);
+  ctx.bezierCurveTo(70, 42, 64, 30, 48, 26);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Shoulder plate — rusted iron
+  ctx.save();
+  ctx.fillStyle = '#5C4838';
+  ctx.beginPath();
+  ctx.ellipse(28, 36, 8, 5, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(20,16,30,0.5)';
+  ctx.beginPath();
+  ctx.ellipse(28, 38, 6, 3, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#3A2418';
+  ctx.fillRect(22, 32, 4, 2);
+  ctx.restore();
+
+  // Skull head with cracked horn
+  ctx.save();
+  const skullG = ctx.createRadialGradient(48, 20, 0, 48, 20, 14);
+  skullG.addColorStop(0, '#C2B8C2');
+  skullG.addColorStop(0.5, '#7A6E80');
+  skullG.addColorStop(1, '#3E3448');
+  ctx.fillStyle = skullG;
+  ctx.beginPath();
+  ctx.ellipse(48, 20, 13, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Jaw shadow
+  ctx.fillStyle = 'rgba(20,16,30,0.5)';
+  ctx.beginPath();
+  ctx.ellipse(48, 28, 8, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Cracked horn (left)
+  ctx.fillStyle = '#A89A78';
+  ctx.beginPath();
+  ctx.moveTo(38, 12);
+  ctx.lineTo(33, 4);
+  ctx.lineTo(36, 14);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Eye-sockets — pulsing amber instead of red
+  ctx.save();
+  ctx.fillStyle = '#08040E';
+  ctx.beginPath();
+  ctx.arc(43, 19, 2.8, 0, Math.PI * 2);
+  ctx.arc(53, 19, 2.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#FFB45A';
+  ctx.beginPath();
+  ctx.arc(43, 19, 1.3, 0, Math.PI * 2);
+  ctx.arc(53, 19, 1.3, 0, Math.PI * 2);
+  ctx.fill();
+  const eyeGlow = ctx.createRadialGradient(48, 19, 0, 48, 19, 18);
+  eyeGlow.addColorStop(0, 'rgba(255,180,90,0.3)');
+  eyeGlow.addColorStop(1, 'rgba(255,180,90,0)');
+  ctx.fillStyle = eyeGlow;
+  ctx.fillRect(28, 4, 40, 30);
+  ctx.restore();
+
+  // Broken sword (right hand, raised slightly)
+  ctx.save();
+  // Blade
+  const bladeG = ctx.createLinearGradient(64, 36, 78, 16);
+  bladeG.addColorStop(0, '#6A5A48');
+  bladeG.addColorStop(0.5, '#A89A82');
+  bladeG.addColorStop(1, '#3A3024');
+  ctx.fillStyle = bladeG;
+  ctx.beginPath();
+  ctx.moveTo(66, 38);
+  ctx.lineTo(72, 36);
+  ctx.lineTo(82, 12);
+  ctx.lineTo(78, 10);
+  // Broken jagged tip
+  ctx.lineTo(80, 16);
+  ctx.lineTo(76, 14);
+  ctx.lineTo(78, 18);
+  ctx.lineTo(74, 16);
+  ctx.closePath();
+  ctx.fill();
+  // Cross-guard
+  ctx.fillStyle = '#3A2418';
+  ctx.fillRect(62, 38, 10, 3);
+  // Hilt
+  ctx.fillStyle = '#5C4838';
+  ctx.fillRect(66, 41, 4, 6);
+  ctx.restore();
+
+  tex.refresh();
+  return key;
+}
+
+/**
+ * Boss draugr — Draugr King. Larger, crowned, golden glow seeping through.
+ * Used as wave-5 mini-boss. 128×128 canvas.
+ */
+export function createDraugrKingTexture(scene, key = 'draugr_king_sprite') {
+  if (scene.textures.exists(key)) return key;
+  const size = 128;
+  const tex = scene.textures.createCanvas(key, size, size);
+  const ctx = tex.getContext();
+
+  // Heavy drop shadow
+  ctx.save();
+  const sh = ctx.createRadialGradient(64, 114, 0, 64, 114, 40);
+  sh.addColorStop(0, 'rgba(0,0,0,0.75)');
+  sh.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = sh;
+  ctx.fillRect(24, 102, 80, 22);
+  ctx.restore();
+
+  // Massive shroud body with helheim-gold seeping through cracks
+  ctx.save();
+  const bodyGrad = ctx.createLinearGradient(0, 32, 0, 110);
+  bodyGrad.addColorStop(0, '#3E2A48');
+  bodyGrad.addColorStop(0.6, '#1F1430');
+  bodyGrad.addColorStop(1, '#08040E');
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.moveTo(64, 36);
+  ctx.bezierCurveTo(40, 40, 30, 56, 30, 78);
+  ctx.bezierCurveTo(26, 92, 34, 108, 42, 110);
+  ctx.lineTo(48, 100);
+  ctx.lineTo(54, 110);
+  ctx.lineTo(60, 96);
+  ctx.lineTo(66, 110);
+  ctx.lineTo(72, 96);
+  ctx.lineTo(78, 110);
+  ctx.lineTo(86, 110);
+  ctx.bezierCurveTo(94, 108, 102, 92, 98, 78);
+  ctx.bezierCurveTo(98, 56, 88, 40, 64, 36);
+  ctx.closePath();
+  ctx.fill();
+  // Gold cracks seeping through
+  ctx.strokeStyle = '#FFB45A';
+  ctx.lineWidth = 1.4;
+  ctx.globalAlpha = 0.85;
+  [[42, 58], [56, 72], [78, 64], [70, 86]].forEach(([cx, cy]) => {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + 6, cy + 8);
+    ctx.lineTo(cx + 4, cy + 14);
+    ctx.stroke();
+  });
+  ctx.restore();
+
+  // Bone crown
+  ctx.save();
+  ctx.fillStyle = '#D8CDB0';
+  // Five spikes
+  for (let i = 0; i < 5; i++) {
+    const px = 50 + i * 7;
+    const height = 6 + (i === 2 ? 4 : 0); // center taller
+    ctx.beginPath();
+    ctx.moveTo(px, 24);
+    ctx.lineTo(px - 2, 22);
+    ctx.lineTo(px - 1, 22 - height);
+    ctx.lineTo(px + 1, 22 - height);
+    ctx.lineTo(px + 2, 22);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Crown band
+  ctx.fillRect(48, 23, 32, 3);
+  ctx.fillStyle = 'rgba(40,30,20,0.5)';
+  ctx.fillRect(48, 24, 32, 1);
+  ctx.restore();
+
+  // Skull head — larger, more imposing
+  ctx.save();
+  const skullG = ctx.createRadialGradient(64, 32, 0, 64, 32, 20);
+  skullG.addColorStop(0, '#C2B8C2');
+  skullG.addColorStop(0.5, '#6A5E70');
+  skullG.addColorStop(1, '#2A2034');
+  ctx.fillStyle = skullG;
+  ctx.beginPath();
+  ctx.ellipse(64, 32, 18, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Jaw shadow
+  ctx.fillStyle = 'rgba(20,16,30,0.5)';
+  ctx.beginPath();
+  ctx.ellipse(64, 42, 12, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Glowing eye-sockets — deeper red with halo
+  ctx.save();
+  ctx.fillStyle = '#08040E';
+  ctx.beginPath();
+  ctx.arc(57, 30, 4, 0, Math.PI * 2);
+  ctx.arc(71, 30, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#FF3322';
+  ctx.beginPath();
+  ctx.arc(57, 30, 2, 0, Math.PI * 2);
+  ctx.arc(71, 30, 2, 0, Math.PI * 2);
+  ctx.fill();
+  // Larger glow halo
+  const eyeGlow = ctx.createRadialGradient(64, 30, 0, 64, 30, 28);
+  eyeGlow.addColorStop(0, 'rgba(255,51,34,0.4)');
+  eyeGlow.addColorStop(1, 'rgba(255,51,34,0)');
+  ctx.fillStyle = eyeGlow;
+  ctx.fillRect(36, 12, 56, 36);
+  ctx.restore();
+
+  // Big broken sword
+  ctx.save();
+  const bladeG = ctx.createLinearGradient(82, 60, 110, 22);
+  bladeG.addColorStop(0, '#6A5A48');
+  bladeG.addColorStop(0.5, '#A89A82');
+  bladeG.addColorStop(1, '#3A3024');
+  ctx.fillStyle = bladeG;
+  ctx.beginPath();
+  ctx.moveTo(84, 62);
+  ctx.lineTo(94, 58);
+  ctx.lineTo(110, 18);
+  ctx.lineTo(105, 14);
+  ctx.lineTo(108, 22);
+  ctx.lineTo(102, 20);
+  ctx.lineTo(106, 26);
+  ctx.lineTo(99, 24);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#3A2418';
+  ctx.fillRect(80, 62, 14, 4);
+  ctx.fillStyle = '#5C4838';
+  ctx.fillRect(86, 66, 4, 8);
+  ctx.restore();
+
+  // Gold aura outline
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,180,90,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(64, 32);
+  ctx.arc(64, 32, 22, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  tex.refresh();
+  return key;
+}
+
+/**
  * Painterly draugr — hunched skull-corpse with pulsing red eye-sockets and
  * tattered shroud. 80×80 canvas, character ~64px tall.
  */
