@@ -90,15 +90,13 @@ export default class SkaldSelectScene extends Phaser.Scene {
     }
 
     // Anchors derived from card dimensions so it scales cleanly
-    const portraitBottom = ry + 16 + (w - 32); // square portrait
+    const portraitBottom = ry + 16 + (w - 32);
     const nameY = portraitBottom + 14;
     const epithetY = nameY + 20;
     const dividerY = epithetY + 16;
     const traumaY = dividerY + 10;
-    // Reserve a clear band for stats at the bottom
-    const statsLineH = 26;
-    const statsY = ry + h - 14;
-    const statsTop = statsY - statsLineH;
+    // Stats sit INSIDE the card with breathing room above and below
+    const statsY = ry + h - 24;
 
     // Name
     const name = this.add.text(cx, nameY, skald.name, {
@@ -126,14 +124,13 @@ export default class SkaldSelectScene extends Phaser.Scene {
       maxLines: 4,
     }).setOrigin(0.5, 0).setDepth(5);
 
-    // Stats line — measure trauma's actual height and anchor stats safely below
-    const traumaBottom = traumaY + trauma.height;
-    const minStatsY = Math.max(statsY, traumaBottom + 14);
-    const stats = this.add.text(cx, minStatsY, skald.statLabel, {
+    // Stats — anchored to the BOTTOM of the card (origin 0.5, 1) so they
+    // always stay inside the card frame regardless of trauma length
+    const stats = this.add.text(cx, statsY, skald.statLabel, {
       fontFamily: "'Space Mono', monospace", fontSize: '10px',
       color: CSS_COLORS.purpleLight, letterSpacing: 1, align: 'center',
       wordWrap: { width: w - 20 }, lineSpacing: 2,
-    }).setOrigin(0.5, 0).setDepth(5);
+    }).setOrigin(0.5, 1).setDepth(5);
 
     // Interactive overlay
     const hit = this.add.rectangle(cx, cy, w, h, 0x000000, 0)

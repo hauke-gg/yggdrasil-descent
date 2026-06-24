@@ -30,11 +30,11 @@ import {
 } from '../utils/SkaldenliedArt.js';
 import { audio } from '../audio/AudioBus.js';
 
-const ROOM_W = 3200;
-const ROOM_H = 3200;
+const ROOM_W = 6400;
+const ROOM_H = 6400;
 const CENTER_X = ROOM_W / 2;
 const CENTER_Y = ROOM_H / 2;
-const HIGGSFIELD_SIZE = 2400; // central painted region — most of the playable map
+const HIGGSFIELD_SIZE = 2800; // central painted region — drumherum prozedural
 
 export default class SkaldenliedScene extends Phaser.Scene {
   constructor() { super('SkaldenliedScene'); }
@@ -88,12 +88,9 @@ export default class SkaldenliedScene extends Phaser.Scene {
     // Show onboarding splash on first entry (or if skipped previously, still show)
     this._showOnboarding();
 
-    // Input
-    this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,ONE,TWO,THREE,SPACE');
+    // Input — auto-cast handles verses now; SPACE keeps the manual swirl
+    this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,SPACE');
     this.input.keyboard.on('keydown-ESC', () => this._returnToMenu());
-    this.input.keyboard.on('keydown-ONE',   () => this._tryCast(0));
-    this.input.keyboard.on('keydown-TWO',   () => this._tryCast(1));
-    this.input.keyboard.on('keydown-THREE', () => this._tryCast(2));
     this.input.keyboard.on('keydown-SPACE', () => this._trySwirl());
 
     // Spawner — three corners, escalating rate
@@ -346,17 +343,18 @@ export default class SkaldenliedScene extends Phaser.Scene {
       this._actionButtons.push(
         this._createActionButton(pos.cx, pos.cy, btnSize, {
           slot: i,
-          keyLabel: onMobile ? '' : String(i + 1),
+          // No keyboard hint — verses auto-cast now
+          keyLabel: '',
           glyph: v.trigger.stab,
           glyphColor: stabColor,
           subLabel: this._verbShort(v.verb.id),
           tooltipText: v.text,
-          tappable: onMobile,
+          tappable: false,
         })
       );
     });
 
-    // 4th button — Skalden-Wirbel (SPACE)
+    // 4th button — Skalden-Wirbel (manual: SPACE or tap on mobile)
     const swirlPos = btnPositions[3];
     this._swirlButton = this._createActionButton(swirlPos.cx, swirlPos.cy, btnSize, {
       slot: -1,
@@ -365,7 +363,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
       glyphColor: 0xFFB45A,
       subLabel: 'Wirbel',
       tooltipText: 'Skalden-Wirbel — 360° AoE-Stoß',
-      tappable: onMobile,
+      tappable: true,
     });
 
     // Verse pop-up text holder — shows full stab-rhyme when a verse fires
@@ -444,15 +442,12 @@ export default class SkaldenliedScene extends Phaser.Scene {
       }).setOrigin(0.5, 0).setDepth(82).setScrollFactor(0);
     }
 
-    // Tap zone — only on mobile, fires the cast/swirl
-    if (opts.tappable) {
+    // Tap zone — only the swirl needs a manual tap; verses auto-cast now
+    if (opts.tappable && opts.slot < 0) {
       const hit = this.add.rectangle(cx, cy, size + 8, size + 8, 0x000000, 0)
         .setInteractive({ useHandCursor: true })
         .setScrollFactor(0).setDepth(84);
-      hit.on('pointerdown', () => {
-        if (opts.slot >= 0) this._tryCast(opts.slot);
-        else this._trySwirl();
-      });
+      hit.on('pointerdown', () => this._trySwirl());
     }
 
     return {
@@ -721,38 +716,43 @@ export default class SkaldenliedScene extends Phaser.Scene {
     layer.add(mono);
     this.tweens.add({ targets: mono, alpha: 1, duration: 800, delay: 1300 });
 
-    // 3 boon cards
+    // 3 boon cards — centered horizontally across the full width, plenty of space
     const choices = rollBoonChoice(god.id);
-    const cw = 200, ch = 130, cgap = 16;
+    const availW = W - 80;
+    const cgap = 16;
+    const cw = Math.min(240, Math.floor((availW - 2 * cgap) / 3));
+    const ch = 150;
     const cardsTotalW = 3 * cw + 2 * cgap;
-    const cardsStartX = W * 0.58 + cardsTotalW / 6 - cardsTotalW / 2 + cw / 2;
-    const cardsY = H * 0.66;
+    const cardsStartX = W / 2 - cardsTotalW / 2 + cw / 2;
+    const cardsY = H * 0.78;
 
     choices.forEach((boon, i) => {
-      const cx = W * 0.58 + (cardsTotalW / 2) - cardsTotalW + i * (cw + cgap) + cw / 2;
+      const cx = cardsStartX + i * (cw + cgap);
       const ry = cardsY - ch / 2;
       const rx = cx - cw / 2;
       const bg = this.add.graphics();
       const draw = (hover) => {
         bg.clear();
-        bg.fillStyle(hover ? 0x1A0F2A : 0x0E0A18, 0.95)
-          .fillRoundedRect(rx, ry, cw, ch, 8);
-        bg.lineStyle(hover ? 3 : 2, hover ? Phaser.Display.Color.HexStringToColor(god.color).color : 0x4a3a5e, hover ? 0.95 : 0.8)
-          .strokeRoundedRect(rx, ry, cw, ch, 8);
+        bg.fillStyle(hover ? 0x2A1F3A : 0x0E0A18, 0.95)
+          .fillRoundedRect(rx, ry, cw, ch, 10);
+        bg.lineStyle(hover ? 3 : 2,
+          hover ? Phaser.Display.Color.HexStringToColor(god.color).color : 0x6a5a7e,
+          hover ? 0.95 : 0.85)
+          .strokeRoundedRect(rx, ry, cw, ch, 10);
       };
       draw(false);
-      const cardName = this.add.text(cx, ry + 18, boon.name, {
-        fontFamily: "'Cinzel', serif", fontSize: '14px', fontStyle: 'bold',
+      const cardName = this.add.text(cx, ry + 20, boon.name, {
+        fontFamily: "'Cinzel', serif", fontSize: '15px', fontStyle: 'bold',
         color: god.color, align: 'center', wordWrap: { width: cw - 16 },
       }).setOrigin(0.5, 0);
-      const cardDesc = this.add.text(cx, ry + 56, boon.description, {
-        fontFamily: "'Lora', serif", fontSize: '11px',
-        color: '#cdb8a8', align: 'center', wordWrap: { width: cw - 20 },
-        lineSpacing: 2,
+      const cardDesc = this.add.text(cx, ry + 62, boon.description, {
+        fontFamily: "'Lora', serif", fontSize: '12px',
+        color: '#e0d8c0', align: 'center', wordWrap: { width: cw - 22 },
+        lineSpacing: 3,
       }).setOrigin(0.5, 0);
-      const hit = this.add.rectangle(cx, cardsY, cw, ch, 0x000000, 0)
+      // Larger tap zone with padding for mobile thumbs
+      const hit = this.add.rectangle(cx, cardsY, cw + 12, ch + 12, 0x000000, 0)
         .setInteractive({ useHandCursor: true });
-
       hit.on('pointerover', () => draw(true));
       hit.on('pointerout', () => draw(false));
       hit.on('pointerdown', () => this._chooseBoon(boon, layer));
@@ -840,9 +840,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(181).setScrollFactor(0).setAlpha(0);
 
     const versHint = this.add.text(W / 2, H * 0.43,
-      onMobile
-        ? 'Rechte Buttons   —   tippen, um Verse zu casten'
-        : '1 · 2 · 3   —   aktive Verse (Tasten gehören zu deinem Lied)', {
+      'Verse casten sich automatisch — beobachte die Cooldown-Symbole unten', {
       fontFamily: "'Cinzel', serif", fontSize: '14px',
       color: '#cc88ff', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(181).setScrollFactor(0).setAlpha(0);
@@ -1039,7 +1037,8 @@ export default class SkaldenliedScene extends Phaser.Scene {
     shakeHeavy(this);
 
     // Use the Higgsfield-painted king if loaded, fallback procedural
-    const key = this.textures.exists('draugr_king_img')
+    const useHiggsfield = this.textures.exists('draugr_king_img');
+    const key = useHiggsfield
       ? makeBlackTransparent(this, 'draugr_king_img')
       : createDraugrKingTexture(this);
     // Spawn the king directly in front of the player, far enough that he walks in
@@ -1048,9 +1047,18 @@ export default class SkaldenliedScene extends Phaser.Scene {
     const ox = px;
     const oy = py - 600;
     const e = this.physics.add.sprite(ox, oy, key);
-    if (key === 'draugr_king_img') {
-      e.setScale(0.18);
-      e.setCircle(180, 332, 380);
+    if (useHiggsfield) {
+      e.setScale(0.22);
+      // BIG hitbox so spells visibly hitting the king actually register
+      e.setCircle(360, 152, 200);
+      // Visible hit indicator — golden aura ring around him
+      const aura = this.add.circle(ox, oy, 92, 0xFFD66B, 0)
+        .setStrokeStyle(3, 0xFFB45A, 0.6).setDepth(17);
+      this.tweens.add({
+        targets: aura, alpha: { from: 0.35, to: 0.7 },
+        duration: 700, yoyo: true, repeat: -1,
+      });
+      e._aura = aura;
     } else {
       e.setCircle(22, 42, 50);
     }
@@ -1099,9 +1107,22 @@ export default class SkaldenliedScene extends Phaser.Scene {
       const d = Math.hypot(dx, dy) || 1;
       const v = e.speed * (e.speedMult || 1);
       e.setVelocity(dx / d * v, dy / d * v);
+      // Keep boss aura attached to the king
+      if (e.kind === 'king' && e._aura) {
+        e._aura.x = e.x;
+        e._aura.y = e.y;
+      }
+      // Keep frost-shards attached if the enemy is frozen
+      if (e._frostShards) {
+        e._frostShards[0].x = e.x;       e._frostShards[0].y = e.y - 12;
+        e._frostShards[1].x = e.x - 8;   e._frostShards[1].y = e.y - 4;
+        e._frostShards[2].x = e.x + 6;   e._frostShards[2].y = e.y - 6;
+      }
+      if (e._frostGlaze) { e._frostGlaze.x = e.x; e._frostGlaze.y = e.y + 8; }
 
-      // Touch damage every 600ms
-      if (d < 22 && this.time.now - e.lastTouchAt > 600) {
+      // Touch damage every 600ms — boss has larger touch radius
+      const touchR = e.kind === 'king' ? 90 : 22;
+      if (d < touchR && this.time.now - e.lastTouchAt > 600) {
         e.lastTouchAt = this.time.now;
         this._playerTakeDamage(e.damage, e.x, e.y);
       }

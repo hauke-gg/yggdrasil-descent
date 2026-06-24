@@ -17,9 +17,10 @@ export default class Skaldenlied {
     this.rhythmBpm = 105;
     this.lastAction = scene.time.now;
     this.silenceTriggered = false;
-    this._cooldowns = {};        // passive-trigger cooldowns
-    this._activeCooldowns = [0, 0, 0]; // active-cast cooldowns per slot (ms wall time)
-    this._activeCdMs = [2200, 1800, 2600]; // tuned per slot
+    this._cooldowns = {};        // passive-trigger cooldowns (kept for back-compat)
+    // Auto-cast Vampire-Survivors style: every verse fires on its own cadence
+    this._autoCooldowns = [0, 0, 0];
+    this._autoCdMs = [1800, 1400, 2000];
     this._silenceMs = 3000;
 
     // Combo
@@ -59,34 +60,40 @@ export default class Skaldenlied {
         }
       },
     });
+
+    // Auto-cast tick — Vampire-Survivors style: each verse fires when its cooldown is ready
+    this._autoTick = scene.time.addEvent({
+      delay: 80,
+      loop: true,
+      callback: () => this._autoCastTick(),
+    });
   }
 
-  /**
-   * Active cast — player pressed 1/2/3. Returns true if fired, false if on cooldown.
-   * Active casts skip the trigger check and resolve immediately with a bonus mult.
-   */
-  castActive(slotIdx) {
-    if (slotIdx < 0 || slotIdx >= this.verses.length) return false;
+  _autoCastTick() {
+    if (!this.scene || !this.scene.player || this.scene.player.hp <= 0) return;
     const now = this.scene.time.now;
-    if (now < this._activeCooldowns[slotIdx]) return false;
-    this._activeCooldowns[slotIdx] = now + this._activeCdMs[slotIdx];
-    const verse = this.verses[slotIdx];
-    this.markAction();
-    this._lastCastAt = now;
-    this.combo = Math.min(3.0, this.combo + 0.5);
-    if (this.onComboChange) this.onComboChange(this.combo);
-    if (this.onVerseFired) this.onVerseFired(verse, true);
-    this._resolve(verse, /*activeBonus*/ 1.5);
-    return true;
+    for (let i = 0; i < this.verses.length; i++) {
+      if (now >= this._autoCooldowns[i]) {
+        this._autoCooldowns[i] = now + this._autoCdMs[i];
+        const verse = this.verses[i];
+        this.markAction();
+        this._lastCastAt = now;
+        if (this.onVerseFired) this.onVerseFired(verse, false);
+        this._resolve(verse, 1.0);
+      }
+    }
   }
 
   getActiveCooldownProgress(slotIdx) {
     const now = this.scene.time.now;
-    const cdEnd = this._activeCooldowns[slotIdx] || 0;
-    const cdLen = this._activeCdMs[slotIdx] || 1;
+    const cdEnd = this._autoCooldowns[slotIdx] || 0;
+    const cdLen = this._autoCdMs[slotIdx] || 1;
     const remaining = Math.max(0, cdEnd - now);
-    return 1 - remaining / cdLen; // 1 = ready, 0 = just fired
+    return 1 - remaining / cdLen;
   }
+
+  /** Legacy active-cast hook — auto-cast is the default now; this stays as a no-op. */
+  castActive() { return false; }
 
   registerHit() {
     if (this.scene.time.now - this._lastCastAt < this._comboDecayDelay) {
@@ -447,7 +454,21 @@ export default class Skaldenlied {
       });
     }
 
-    // Apply slow + tint on enemies
+    // Sparkle motes drifting up from the ground (real frost shimmer)
+    for (let i = 0; i < 18; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.random() * radius;
+      const sx = x + Math.cos(a) * r;
+      const sy = y + Math.sin(a) * r;
+      const mote = scene.add.circle(sx, sy, 1.5, 0xFFFFFF, 0.9).setDepth(42);
+      scene.tweens.add({
+        targets: mote, y: sy - 30 - Math.random() * 20, alpha: 0,
+        duration: 800 + Math.random() * 400, delay: Math.random() * 300,
+        ease: 'Cubic.easeOut', onComplete: () => mote.destroy(),
+      });
+    }
+
+    // Apply slow + tint + ice-shard overlay on enemies in radius
     if (scene.enemies) {
       scene.enemies.children.iterate((e) => {
         if (!e || !e.active) return;
@@ -455,8 +476,19 @@ export default class Skaldenlied {
         if (dx * dx + dy * dy <= radius * radius) {
           e.speedMult = slow;
           e.setTint(0x88BBFF);
+          // Ice shards encrusting the enemy
+          const shardA = scene.add.triangle(e.x, e.y - 12, 0, 0, 4, -12, 8, 0, 0xDDEEFF, 0.9).setDepth(20);
+          const shardB = scene.add.triangle(e.x - 8, e.y - 4, 0, 0, 3, -8, 6, 0, 0xCCEEFF, 0.9).setDepth(20);
+          const shardC = scene.add.triangle(e.x + 6, e.y - 6, 0, 0, 3, -10, 6, 0, 0xDDEEFF, 0.9).setDepth(20);
+          e._frostShards = [shardA, shardB, shardC];
+          // Frost glaze patch on the ground beneath them
+          const glaze = scene.add.ellipse(e.x, e.y + 8, 30, 12, 0xAADDFF, 0.45).setDepth(-1.1);
+          e._frostGlaze = glaze;
           scene.time.delayedCall(dur, () => {
             if (e && e.active) { e.speedMult = 1; e.clearTint(); }
+            shardA?.destroy(); shardB?.destroy(); shardC?.destroy();
+            glaze?.destroy();
+            if (e) { e._frostShards = null; e._frostGlaze = null; }
           });
         }
       });
@@ -493,5 +525,6 @@ export default class Skaldenlied {
     this._rhythmEvent?.remove();
     this._silenceCheck?.remove();
     this._comboTick?.remove();
+    this._autoTick?.remove();
   }
 }
