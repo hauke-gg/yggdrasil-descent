@@ -204,74 +204,179 @@ export default class Skaldenlied {
   }
 
   _spawnBurst(x, y, damage) {
-    // Wind-burst: 12 amber-gold projectiles in a flat star + brief wind ring
+    // Wind-Sicheln: crescent-shaped blades fan out, rotating as they fly
     const scene = this.scene;
-    for (let i = 0; i < 12; i++) {
-      const angle = (i / 12) * Math.PI * 2;
-      this._spawnProjectile(x, y, angle, damage, 0xffcc66, 420, 750);
+    const bladeCount = 10;
+    for (let i = 0; i < bladeCount; i++) {
+      const angle = (i / bladeCount) * Math.PI * 2;
+      const dx = Math.cos(angle), dy = Math.sin(angle);
+      const blade = scene.add.graphics().setDepth(42).setScrollFactor(1);
+      blade.fillStyle(0xFFD66B, 0.9);
+      // Crescent shape via two arcs
+      blade.beginPath();
+      blade.arc(0, 0, 18, -1.0, 1.0, false);
+      blade.arc(0, -4, 16, 1.0, -1.0, true);
+      blade.closePath();
+      blade.fillPath();
+      blade.lineStyle(1.2, 0xFFB45A, 1);
+      blade.strokePath();
+      blade.x = x; blade.y = y;
+      blade.rotation = angle - Math.PI / 2;
+      scene.tweens.add({
+        targets: blade,
+        x: x + dx * 240,
+        y: y + dy * 240,
+        rotation: blade.rotation + Math.PI * 3,
+        alpha: 0,
+        duration: 600,
+        ease: 'Cubic.easeOut',
+        onComplete: () => blade.destroy(),
+      });
+      // Still spawn an invisible damage projectile that follows the same angle
+      this._spawnProjectile(x, y, angle, damage, 0xffcc66, 500, 600);
     }
-    // Outward gust ring (yellow)
-    const ring = scene.add.circle(x, y, 14, 0xffcc66, 0)
-      .setStrokeStyle(3, 0xFFE5B0, 0.85).setDepth(38);
+    // Central whirl pulse
+    const whirl = scene.add.circle(x, y, 10, 0xFFE5B0, 0.65).setDepth(40);
     scene.tweens.add({
-      targets: ring, radius: 90, alpha: 0, duration: 320, ease: 'Cubic.easeOut',
-      onComplete: () => ring.destroy(),
+      targets: whirl, radius: 70, alpha: 0,
+      duration: 380, ease: 'Cubic.easeOut',
+      onComplete: () => whirl.destroy(),
     });
   }
 
   _spawnStrike(x, y, damage) {
-    // Spear-strike: fast cyan-white lance + crack-line streaks behind it
+    // Speerwurf: a long spear sprite flies toward the target with a fading trail
     const scene = this.scene;
     const target = this._nearestEnemy(x, y);
     if (!target) return;
     const angle = Math.atan2(target.y - y, target.x - x);
-    this._spawnProjectile(x, y, angle, damage, 0xcceeff, 850, 500);
-    // Crack streak trail
-    for (let i = 0; i < 5; i++) {
-      const offsetAngle = angle + (Math.random() - 0.5) * 0.3;
-      const dist = 30 + Math.random() * 60;
-      const streak = scene.add.rectangle(
-        x + Math.cos(offsetAngle) * dist,
-        y + Math.sin(offsetAngle) * dist,
-        14, 2, 0xddeeff, 0.85,
-      ).setDepth(39).setRotation(angle);
+    const distance = Math.hypot(target.x - x, target.y - y);
+
+    // Spear: long thin gradient shape
+    const spear = scene.add.graphics().setDepth(45);
+    spear.fillStyle(0xCCEEFF, 1);
+    // Shaft
+    spear.fillRect(-26, -1.5, 52, 3);
+    // Tip
+    spear.fillTriangle(26, -4, 26, 4, 38, 0);
+    // Tail wraps
+    spear.fillStyle(0x88AABB, 1);
+    spear.fillRect(-26, -2.5, 6, 5);
+    spear.fillRect(-18, -2.5, 4, 5);
+    spear.x = x; spear.y = y;
+    spear.rotation = angle;
+    spear.damage = damage;
+    spear.maxTravel = Math.min(distance + 60, 500);
+    spear.traveled = 0;
+    spear.alive = true;
+
+    // Motion-blur ghosts
+    const spawnGhost = () => {
+      if (!spear.alive) return;
+      const g = scene.add.graphics().setDepth(43);
+      g.fillStyle(0xCCEEFF, 0.35);
+      g.fillRect(-22, -1, 44, 2);
+      g.x = spear.x; g.y = spear.y; g.rotation = spear.rotation;
       scene.tweens.add({
-        targets: streak, alpha: 0, scaleX: 0,
-        duration: 220, ease: 'Cubic.easeOut',
-        onComplete: () => streak.destroy(),
+        targets: g, alpha: 0, scale: 0.6,
+        duration: 280, onComplete: () => g.destroy(),
       });
-    }
+      scene.time.delayedCall(40, spawnGhost);
+    };
+    spawnGhost();
+
+    // Drive the spear forward and damage on contact
+    const dx = Math.cos(angle), dy = Math.sin(angle);
+    scene.tweens.add({
+      targets: spear,
+      x: x + dx * spear.maxTravel,
+      y: y + dy * spear.maxTravel,
+      duration: 360,
+      ease: 'Cubic.easeOut',
+      onUpdate: () => {
+        if (!spear.alive || !scene.enemies) return;
+        scene.enemies.children.iterate((e) => {
+          if (!e || !e.active || !spear.alive) return;
+          const ex = e.x - spear.x, ey = e.y - spear.y;
+          if (ex * ex + ey * ey < 32 * 32) {
+            spear.alive = false;
+            scene.damageEnemy?.(e, damage, spear.x, spear.y);
+            // Impact burst
+            const burst = scene.add.circle(spear.x, spear.y, 8, 0xFFFFFF, 0.9).setDepth(46);
+            scene.tweens.add({
+              targets: burst, radius: 36, alpha: 0,
+              duration: 220, onComplete: () => burst.destroy(),
+            });
+            spear.destroy();
+          }
+        });
+      },
+      onComplete: () => { if (spear.active) spear.destroy(); spear.alive = false; },
+    });
   }
 
   _spawnNova(x, y, radius, damage) {
-    // Void-nova: violet ring + dark shockwave + inner purple sparks
+    // Stern-Schock: 6-pointed expanding star with runic glyphs + shockwave
     const scene = this.scene;
-    const outerRing = scene.add.circle(x, y, 14, 0x9966ff, 0)
-      .setStrokeStyle(4, 0xBB88FF, 1).setDepth(40);
+
+    // Dark shockwave (inner solid)
+    const shock = scene.add.circle(x, y, 8, 0x1A0F2A, 0.85).setDepth(38);
     scene.tweens.add({
-      targets: outerRing, radius, alpha: 0,
-      duration: 420, ease: 'Cubic.easeOut',
-      onComplete: () => outerRing.destroy(),
+      targets: shock, radius: radius * 0.5, alpha: 0,
+      duration: 260, ease: 'Cubic.easeOut',
+      onComplete: () => shock.destroy(),
     });
-    const innerRing = scene.add.circle(x, y, 8, 0x4a1088, 0.55).setDepth(39);
+
+    // 6-pointed star ring
+    const star = scene.add.graphics().setDepth(42);
+    const drawStar = (innerR, outerR, alpha) => {
+      star.clear();
+      star.lineStyle(3, 0xFFD66B, alpha);
+      star.fillStyle(0xBB88FF, alpha * 0.6);
+      star.beginPath();
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+        const r = i % 2 === 0 ? outerR : innerR;
+        const px = x + Math.cos(a) * r;
+        const py = y + Math.sin(a) * r;
+        if (i === 0) star.moveTo(px, py); else star.lineTo(px, py);
+      }
+      star.closePath();
+      star.fillPath();
+      star.strokePath();
+    };
+    const starState = { r: 10, a: 1 };
+    drawStar(starState.r * 0.5, starState.r, starState.a);
     scene.tweens.add({
-      targets: innerRing, radius: radius * 0.7, alpha: 0,
-      duration: 320, ease: 'Cubic.easeIn',
-      onComplete: () => innerRing.destroy(),
+      targets: starState,
+      r: radius * 0.95,
+      a: 0,
+      duration: 540,
+      ease: 'Cubic.easeOut',
+      onUpdate: () => drawStar(starState.r * 0.5, starState.r, starState.a),
+      onComplete: () => star.destroy(),
     });
-    // Violet sparks
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * Math.PI * 2;
-      const spark = scene.add.circle(x, y, 2, 0xCC88FF, 1).setDepth(41);
+
+    // Rotating Norse glyphs in the burst
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const glyph = scene.add.text(x, y,
+        ['ᚦ', 'ᛟ', 'ᛉ', 'ᚹ', 'ᛒ', 'ᛇ'][i],
+        { fontFamily: "'Cinzel', serif", fontSize: '28px', color: '#FFD66B',
+          stroke: '#000', strokeThickness: 3 },
+      ).setOrigin(0.5).setDepth(43);
       scene.tweens.add({
-        targets: spark,
-        x: x + Math.cos(a) * radius * 0.9,
-        y: y + Math.sin(a) * radius * 0.9,
+        targets: glyph,
+        x: x + Math.cos(a) * radius * 0.75,
+        y: y + Math.sin(a) * radius * 0.75,
         alpha: 0,
-        duration: 360 + Math.random() * 120, ease: 'Cubic.easeOut',
-        onComplete: () => spark.destroy(),
+        rotation: Math.PI * 2,
+        duration: 600,
+        ease: 'Cubic.easeOut',
+        onComplete: () => glyph.destroy(),
       });
     }
+
     if (scene.enemies) {
       scene.enemies.children.iterate((e) => {
         if (!e || !e.active) return;
@@ -284,28 +389,65 @@ export default class Skaldenlied {
   }
 
   _applyFreeze(x, y, radius, slow, dur) {
-    // Frost-aura: thick ice-blue dome with crystal points + slow lingering haze
+    // Frost-Sturm: ground-frost ring + 14 upward-growing ice crystals + hex frost pattern
     const scene = this.scene;
-    const dome = scene.add.circle(x, y, radius, 0x66aaff, 0.18).setDepth(38);
-    const rim = scene.add.circle(x, y, radius, 0xAADDFF, 0)
-      .setStrokeStyle(2.5, 0xCCEEFF, 0.9).setDepth(40);
-    scene.tweens.add({ targets: dome, alpha: 0, duration: 1200,
-      onComplete: () => dome.destroy() });
-    scene.tweens.add({ targets: rim, scale: 1.05, alpha: 0, duration: 700,
-      ease: 'Cubic.easeOut', onComplete: () => rim.destroy() });
-    // Ice crystal spikes around the rim
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2;
-      const cx = x + Math.cos(a) * radius * 0.9;
-      const cy = y + Math.sin(a) * radius * 0.9;
-      const crystal = scene.add.triangle(cx, cy, 0, 0, 6, -14, 12, 0, 0xDDEEFF, 0.85)
-        .setRotation(a + Math.PI / 2).setDepth(41);
+
+    // Ground frost — flat hexagonal pattern that fades over time
+    const groundFrost = scene.add.graphics().setDepth(-1.2);
+    groundFrost.lineStyle(2, 0xCCEEFF, 0.6);
+    const hex = (cx, cy, r) => {
+      groundFrost.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const px = cx + Math.cos(a) * r;
+        const py = cy + Math.sin(a) * r;
+        if (i === 0) groundFrost.moveTo(px, py); else groundFrost.lineTo(px, py);
+      }
+      groundFrost.closePath();
+      groundFrost.strokePath();
+    };
+    hex(x, y, radius * 0.95);
+    hex(x, y, radius * 0.7);
+    hex(x, y, radius * 0.45);
+    // Spokes
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      groundFrost.beginPath();
+      groundFrost.moveTo(x, y);
+      groundFrost.lineTo(x + Math.cos(a) * radius * 0.95, y + Math.sin(a) * radius * 0.95);
+      groundFrost.strokePath();
+    }
+    scene.tweens.add({
+      targets: groundFrost, alpha: 0, duration: dur,
+      onComplete: () => groundFrost.destroy(),
+    });
+
+    // Upward-growing ice crystals at random points inside the radius
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.random() * radius * 0.9;
+      const cx = x + Math.cos(a) * r;
+      const cy = y + Math.sin(a) * r;
+      const h = 14 + Math.random() * 16;
+      const w = 6 + Math.random() * 4;
+      const crystal = scene.add.graphics().setDepth(41);
+      crystal.fillStyle(0xCCEEFF, 0.9);
+      crystal.fillTriangle(0, 0, w, -h, w * 2, 0);
+      crystal.lineStyle(1, 0x88BBFF, 1);
+      crystal.strokeTriangle(0, 0, w, -h, w * 2, 0);
+      crystal.x = cx - w; crystal.y = cy;
+      crystal.setScale(0, 0);
       scene.tweens.add({
-        targets: crystal, alpha: 0, scale: 0.5,
-        duration: 700, delay: 50 + i * 18,
+        targets: crystal, scaleX: 1, scaleY: 1,
+        duration: 280, delay: i * 18, ease: 'Back.easeOut',
+      });
+      scene.tweens.add({
+        targets: crystal, alpha: 0, duration: 600, delay: dur - 600,
         onComplete: () => crystal.destroy(),
       });
     }
+
+    // Apply slow + tint on enemies
     if (scene.enemies) {
       scene.enemies.children.iterate((e) => {
         if (!e || !e.active) return;

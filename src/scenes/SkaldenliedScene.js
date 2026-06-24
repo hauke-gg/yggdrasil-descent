@@ -241,19 +241,11 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this._playerBaseScale = this.player.scaleX;
     this._playerFacing = 1; // 1 = right, -1 = left
 
-    // Idle breath: visible scaleY pulse
+    // Idle breath: visible scaleY pulse — NOTE: no .y tween, that would
+    // fight the velocity-driven vertical movement.
     this.tweens.add({
       targets: this.player,
       scaleY: this.player.scaleY * 1.08,
-      duration: 1200,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-    // Subtle bob
-    this.tweens.add({
-      targets: this.player,
-      y: this.player.y - 3,
       duration: 1200,
       yoyo: true,
       repeat: -1,
@@ -925,9 +917,6 @@ export default class SkaldenliedScene extends Phaser.Scene {
         this._playerFacing = -1;
         this.player.setScale(-this._playerBaseScale, Math.abs(this.player.scaleY));
       }
-      // Walk bob — slight y oscillation
-      this._walkBob = (this._walkBob || 0) + delta * 0.012;
-      this.player.y += Math.sin(this._walkBob) * 0.35;
     } else {
       this.player.setVelocity(0, 0);
     }
