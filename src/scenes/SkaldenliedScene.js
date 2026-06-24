@@ -16,6 +16,8 @@ import { DEFAULT_VERSES, buildVerses } from '../data/verses.js';
 import { SKALDS, DEFAULT_SKALD } from '../data/skalds.js';
 import { GODS, BOON_LIBRARY, rollBoonChoice } from '../data/boons.js';
 import { LEVELUP_BOONS, rollLevelupChoice, xpToLevel } from '../data/levelupBoons.js';
+import { ITEM_TYPES, rollItemDrop, bossItemDrop } from '../data/items.js';
+import { CHEST_BOONS, rollChestChoice } from '../data/chestBoons.js';
 import { isMobile } from '../utils/MobileDetect.js';
 import VirtualJoystick from '../ui/VirtualJoystick.js';
 import { makeBlackTransparent } from '../utils/SpritePostprocess.js';
@@ -117,6 +119,8 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this._levelUpActive = false;
     this._xpOrbs = this.physics.add.group();
     this._magnetRadiusBase = 90;
+    this._itemsList = [];
+    this._chestsList = [];
 
     // Projectile-enemy overlap
     this.physics.world.on('worldstep', () => this._updateProjectiles());
@@ -849,6 +853,286 @@ export default class SkaldenliedScene extends Phaser.Scene {
     }
   }
 
+  _spawnItem(x, y, typeId) {
+    const type = ITEM_TYPES[typeId];
+    if (!type) return;
+    const container = this.add.container(x, y).setDepth(17);
+    // Pulsing halo
+    const halo = this.add.circle(0, 0, 22, type.color, 0.28);
+    // Frame
+    const frame = this.add.circle(0, 0, 14, 0x0E0A18, 0.95);
+    frame.setStrokeStyle(2, type.color, 1);
+    // Icon glyph
+    let icon;
+    if (type.icon === 'flask') {
+      icon = this.add.text(0, 0, '♥', {
+        fontFamily: 'serif', fontSize: '20px', color: '#FFFFFF',
+      }).setOrigin(0.5);
+    } else if (type.icon === 'star') {
+      icon = this.add.text(0, 0, '★', {
+        fontFamily: 'serif', fontSize: '18px', color: '#FFFFFF',
+      }).setOrigin(0.5);
+    } else {
+      icon = this.add.text(0, 0, '✦', {
+        fontFamily: 'serif', fontSize: '18px', color: '#FFFFFF',
+      }).setOrigin(0.5);
+    }
+    container.add([halo, frame, icon]);
+    container.typeId = typeId;
+    container.bornAt = this.time.now;
+    container.setScale(0);
+    this.tweens.add({ targets: container, scale: 1, duration: 280, ease: 'Back.easeOut' });
+    this.tweens.add({
+      targets: halo, scale: { from: 1, to: 1.3 }, alpha: { from: 0.28, to: 0.15 },
+      duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+    this._itemsList.push(container);
+  }
+
+  _updateItems(delta) {
+    if (!this._itemsList || this._itemsList.length === 0) return;
+    const px = this.player.x, py = this.player.y;
+    const collectR = 28;
+    for (let i = this._itemsList.length - 1; i >= 0; i--) {
+      const item = this._itemsList[i];
+      if (!item || !item.active) { this._itemsList.splice(i, 1); continue; }
+      const dx = px - item.x, dy = py - item.y;
+      const d = Math.hypot(dx, dy);
+      if (d < collectR) {
+        this._collectItem(item.typeId, item.x, item.y);
+        item.destroy();
+        this._itemsList.splice(i, 1);
+      }
+    }
+  }
+
+  _collectItem(typeId, x, y) {
+    const type = ITEM_TYPES[typeId];
+    audio.pickup();
+    audio.cast();
+    if (typeId === 'hp_potion') {
+      const heal = 20;
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + heal);
+      damagePopup(this, x, y - 20, '+' + heal, false);
+    } else if (typeId === 'xp_burst') {
+      this._gainXp(10);
+      damagePopup(this, x, y - 20, '+10 XP', false);
+    } else if (typeId === 'magnet') {
+      // Pull every orb on the map to the player
+      if (this._xpOrbsList) {
+        this._xpOrbsList.forEach((orb) => {
+          if (!orb || !orb.active) return;
+          this.tweens.add({
+            targets: orb, x: this.player.x, y: this.player.y,
+            duration: 320, ease: 'Cubic.easeIn',
+          });
+          if (orb._halo) this.tweens.add({
+            targets: orb._halo, x: this.player.x, y: this.player.y, duration: 320,
+          });
+        });
+      }
+      damagePopup(this, x, y - 20, 'MAGNET!', true);
+    }
+    // Pickup ring
+    const ring = this.add.circle(x, y, 12, type.color, 0)
+      .setStrokeStyle(3, type.color, 1).setDepth(28);
+    this.tweens.add({
+      targets: ring, radius: 50, alpha: 0, duration: 380, ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
+    });
+  }
+
+  _spawnChest(x, y) {
+    const container = this.add.container(x, y).setDepth(18);
+    // Chest body
+    const body = this.add.graphics();
+    body.fillStyle(0x8a6a12, 1).fillRoundedRect(-18, -10, 36, 26, 4);
+    body.lineStyle(2, 0xC9A961, 1).strokeRoundedRect(-18, -10, 36, 26, 4);
+    // Lid
+    body.fillStyle(0xC9A961, 1).fillRoundedRect(-18, -16, 36, 10, 4);
+    body.lineStyle(2, 0xFFD66B, 1).strokeRoundedRect(-18, -16, 36, 10, 4);
+    // Lock
+    body.fillStyle(0x1A1422, 1).fillRoundedRect(-3, -5, 6, 8, 1);
+    // Halo
+    const halo = this.add.circle(0, 0, 36, 0xFFD66B, 0.25);
+    container.add([halo, body]);
+    container.bornAt = this.time.now;
+    container.setScale(0);
+    this.tweens.add({
+      targets: container, scale: 1, y: y - 4,
+      duration: 380, ease: 'Back.easeOut',
+    });
+    this.tweens.add({
+      targets: halo,
+      scale: { from: 1, to: 1.4 }, alpha: { from: 0.25, to: 0.1 },
+      duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+    // Floating motes around chest
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2;
+      const mote = this.add.circle(0, 0, 1.5, 0xFFFFFF, 0.85);
+      container.add(mote);
+      this.tweens.add({
+        targets: mote,
+        x: Math.cos(angle) * 32, y: Math.sin(angle) * 22 - 4,
+        duration: 1400, delay: i * 150,
+        yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      });
+    }
+    this._chestsList.push(container);
+  }
+
+  _updateChests(delta) {
+    if (!this._chestsList || this._chestsList.length === 0) return;
+    const px = this.player.x, py = this.player.y;
+    const openR = 32;
+    for (let i = this._chestsList.length - 1; i >= 0; i--) {
+      const chest = this._chestsList[i];
+      if (!chest || !chest.active) { this._chestsList.splice(i, 1); continue; }
+      const dx = px - chest.x, dy = py - chest.y;
+      const d = Math.hypot(dx, dy);
+      if (d < openR && !chest._opened) {
+        chest._opened = true;
+        this._openChest(chest);
+        this._chestsList.splice(i, 1);
+      }
+    }
+  }
+
+  _openChest(chest) {
+    audio.bossDeath();
+    shakeHeavy(this);
+    // Burst of golden particles
+    for (let i = 0; i < 22; i++) {
+      const angle = (i / 22) * Math.PI * 2;
+      const spark = this.add.circle(chest.x, chest.y, 3, 0xFFD66B, 1).setDepth(40);
+      this.tweens.add({
+        targets: spark,
+        x: chest.x + Math.cos(angle) * 80,
+        y: chest.y + Math.sin(angle) * 80,
+        alpha: 0,
+        duration: 700, ease: 'Cubic.easeOut',
+        onComplete: () => spark.destroy(),
+      });
+    }
+    const flash = this.add.circle(chest.x, chest.y, 14, 0xFFD66B, 0.9).setDepth(39);
+    this.tweens.add({
+      targets: flash, radius: 90, alpha: 0,
+      duration: 520, onComplete: () => flash.destroy(),
+    });
+    this.tweens.add({
+      targets: chest, alpha: 0, scale: 0.6,
+      duration: 320, delay: 200,
+      onComplete: () => chest.destroy(),
+    });
+    // Show chest-boon choice after the burst
+    this.time.delayedCall(700, () => this._presentChestBoonChoice());
+  }
+
+  _presentChestBoonChoice() {
+    if (this._chestBoonActive) return;
+    this._chestBoonActive = true;
+    this.physics.pause();
+    const W = this.scale.width, H = this.scale.height;
+    const layer = this.add.container(0, 0).setDepth(220).setScrollFactor(0);
+    const ov = this.add.graphics();
+    ov.fillStyle(0x000000, 0).fillRect(0, 0, W, H);
+    layer.add(ov);
+    this.tweens.add({ targets: ov, fillAlpha: 0.82, duration: 500 });
+
+    const title = this.add.text(W / 2, H * 0.18, 'TRUHE', {
+      fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '42px',
+      color: '#FFD66B', fontStyle: 'bold', letterSpacing: 10,
+      stroke: '#000', strokeThickness: 4,
+      shadow: { offsetX: 0, offsetY: 0, color: '#FFB45A', blur: 20, fill: true },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(222).setAlpha(0);
+    layer.add(title);
+    this.tweens.add({ targets: title, alpha: 1, scale: { from: 0.6, to: 1 }, duration: 600, ease: 'Back.easeOut' });
+
+    const sub = this.add.text(W / 2, H * 0.27,
+      'Drei Gaben aus Bragis Schatz — wähle eine.', {
+      fontFamily: "'Lora', serif", fontStyle: 'italic',
+      fontSize: '14px', color: '#a89888',
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(222).setAlpha(0);
+    layer.add(sub);
+    this.tweens.add({ targets: sub, alpha: 1, duration: 500, delay: 300 });
+
+    const choices = rollChestChoice();
+    const cw = Math.min(260, Math.floor((W - 100) / 3));
+    const ch = 180;
+    const gap = 18;
+    const totalW = 3 * cw + 2 * gap;
+    const startX = W / 2 - totalW / 2 + cw / 2;
+    const cardsY = H * 0.6;
+
+    choices.forEach((boon, i) => {
+      const cx = startX + i * (cw + gap);
+      const ry = cardsY - ch / 2;
+      const rx = cx - cw / 2;
+      const bg = this.add.graphics().setScrollFactor(0).setDepth(221);
+      const draw = (hover) => {
+        bg.clear();
+        bg.fillStyle(hover ? 0x3A2A18 : 0x1A0F08, 0.95)
+          .fillRoundedRect(rx, ry, cw, ch, 12);
+        bg.lineStyle(hover ? 4 : 3, 0xFFD66B, hover ? 0.95 : 0.85)
+          .strokeRoundedRect(rx, ry, cw, ch, 12);
+      };
+      draw(false);
+      const tierBadge = this.add.text(rx + 12, ry + 10, '★★★', {
+        fontFamily: "'Cinzel', serif", fontSize: '15px',
+        color: '#FFD66B', fontStyle: 'bold',
+      }).setScrollFactor(0).setDepth(222);
+      const name = this.add.text(cx, ry + 42, boon.name, {
+        fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '17px',
+        fontStyle: 'bold',
+        color: '#FFD66B', align: 'center', wordWrap: { width: cw - 20 },
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(222);
+      const desc = this.add.text(cx, ry + 90, boon.desc, {
+        fontFamily: "'Lora', serif", fontSize: '12px',
+        color: '#e8dcc0', align: 'center', wordWrap: { width: cw - 26 },
+        lineSpacing: 3,
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(222);
+      const hit = this.add.rectangle(cx, cardsY, cw + 20, ch + 20, 0x000000, 0)
+        .setInteractive({ useHandCursor: true })
+        .setScrollFactor(0).setDepth(223);
+      hit.on('pointerover', () => draw(true));
+      hit.on('pointerout', () => draw(false));
+      hit.on('pointerdown', () => this._chooseChestBoon(boon, layer));
+      layer.add([bg, tierBadge, name, desc, hit]);
+      [bg, tierBadge, name, desc].forEach(o => o.setAlpha(0));
+      this.tweens.add({
+        targets: [bg, tierBadge, name, desc],
+        alpha: 1, duration: 500, delay: 700 + i * 200,
+      });
+    });
+  }
+
+  _chooseChestBoon(boon, layer) {
+    this._boonState = this._boonState || {
+      dmgMult: 1, spdMult: 1, cdMult: 1, swirlCdMult: 1, swirlDmgMult: 1,
+      maxHpMult: 1, maxHpBonus: 0, comboDecayMult: 1, comboCap: 3.0,
+      critBonus: 0, healOnCrit: 0, healOnKill: 0, magnetMult: 1, xpMult: 1,
+      healOnApply: 0, doubleCast: false, echoCastChance: 0,
+    };
+    boon.apply(this._boonState);
+    this._applyBoonStateToPlayer();
+    const ring = this.add.circle(this.player.x, this.player.y, 12, 0xFFD66B, 0)
+      .setStrokeStyle(4, 0xFFD66B, 1).setDepth(28);
+    this.tweens.add({
+      targets: ring, radius: 200, alpha: 0,
+      duration: 1000, ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
+    });
+    this.tweens.add({
+      targets: layer.list, alpha: 0, duration: 500,
+      onComplete: () => {
+        layer.destroy();
+        this.physics.resume();
+        this._chestBoonActive = false;
+      },
+    });
+  }
+
   _spawnXpOrbs(x, y, value) {
     // Spawn ONE orb representing the total xp value — colour scales with value
     const color = value >= 20 ? 0xFFD66B : value >= 3 ? 0x88EEFF : 0x66AAFF;
@@ -1166,6 +1450,8 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this._updateEnemies(delta);
     this._updateCooldownBars();
     this._updateXpOrbs(delta);
+    this._updateItems(delta);
+    this._updateChests(delta);
   }
 
   _updateHpBar() {
@@ -1449,6 +1735,15 @@ export default class SkaldenliedScene extends Phaser.Scene {
       if (e.kind === 'skinwalker') xpValue = 2;
       if (wasBoss)                xpValue = 25;
       this._spawnXpOrbs(e.x, e.y, xpValue);
+
+      // Item drop chance — bosses always drop a chest + item
+      if (wasBoss) {
+        this._spawnItem(e.x - 50, e.y, bossItemDrop());
+        this._spawnChest(e.x + 50, e.y);
+      } else {
+        const itemType = rollItemDrop();
+        if (itemType) this._spawnItem(e.x, e.y, itemType);
+      }
 
       if (wasBoss) {
         this._bossActive = false;
