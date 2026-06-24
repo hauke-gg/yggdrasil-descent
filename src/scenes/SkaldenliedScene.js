@@ -15,6 +15,7 @@ import Skaldenlied from '../systems/Skaldenlied.js';
 import { DEFAULT_VERSES, buildVerses } from '../data/verses.js';
 import { SKALDS, DEFAULT_SKALD } from '../data/skalds.js';
 import { GODS, BOON_LIBRARY, rollBoonChoice } from '../data/boons.js';
+import { LEVELUP_BOONS, rollLevelupChoice, xpToLevel } from '../data/levelupBoons.js';
 import { isMobile } from '../utils/MobileDetect.js';
 import VirtualJoystick from '../ui/VirtualJoystick.js';
 import { makeBlackTransparent } from '../utils/SpritePostprocess.js';
@@ -107,6 +108,15 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this._totalKills = 0;
     this._bossPending = false;
     this._bossActive = false;
+
+    // XP / Level state — Vampire-Survivors style
+    this._xp = 0;
+    this._level = 1;
+    this._xpToNext = xpToLevel(2);
+    this._xpToCurrent = xpToLevel(1);
+    this._levelUpActive = false;
+    this._xpOrbs = this.physics.add.group();
+    this._magnetRadiusBase = 90;
 
     // Projectile-enemy overlap
     this.physics.world.on('worldstep', () => this._updateProjectiles());
@@ -284,10 +294,21 @@ export default class SkaldenliedScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(83).setScrollFactor(0);
 
     // Kill counter (right)
-    this._killText = this.add.text(W - 12, 22, '0 Gefallen', {
+    this._killText = this.add.text(W - 12, 16, '0 Gefallen', {
       fontFamily: "'Space Mono', monospace", fontSize: '12px',
       color: '#ffaaaa',
-    }).setOrigin(1, 0.5).setDepth(82).setScrollFactor(0);
+    }).setOrigin(1, 0).setDepth(82).setScrollFactor(0);
+
+    // Level indicator under kill counter
+    this._levelText = this.add.text(W - 12, 32, 'LV 1', {
+      fontFamily: "'Cinzel', serif", fontSize: '12px',
+      color: '#66AAFF', fontStyle: 'bold',
+    }).setOrigin(1, 0).setDepth(82).setScrollFactor(0);
+
+    // XP bar at the bottom (above the action buttons)
+    this._xpBarBg = this.add.graphics().setDepth(81).setScrollFactor(0);
+    this._xpBarBg.fillStyle(0x1A0F2A, 0.85).fillRect(0, H - 6, W, 4);
+    this._xpBarFill = this.add.graphics().setDepth(82).setScrollFactor(0);
 
     // Center title
     this.add.text(W / 2, 14, 'WURZELKAMMER', {
@@ -820,6 +841,202 @@ export default class SkaldenliedScene extends Phaser.Scene {
     }
   }
 
+  _spawnXpOrbs(x, y, value) {
+    // Spawn ONE orb representing the total xp value — colour scales with value
+    const color = value >= 20 ? 0xFFD66B : value >= 3 ? 0x88EEFF : 0x66AAFF;
+    const orb = this.add.circle(x, y, value >= 20 ? 10 : value >= 3 ? 7 : 5, color, 0.95)
+      .setStrokeStyle(1.5, 0xFFFFFF, 0.8)
+      .setDepth(16);
+    orb.value = value;
+    orb.bornAt = this.time.now;
+    // Soft glow halo
+    const halo = this.add.circle(x, y, value >= 20 ? 18 : 12, color, 0.25).setDepth(15);
+    orb._halo = halo;
+    // Small pop on spawn
+    orb.setScale(0.4);
+    this.tweens.add({ targets: orb, scale: 1, duration: 200, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: halo, scale: { from: 0.4, to: 1 }, duration: 200 });
+    // Random scatter
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 30 + Math.random() * 40;
+    this.tweens.add({
+      targets: [orb, halo],
+      x: x + Math.cos(ang) * dist,
+      y: y + Math.sin(ang) * dist,
+      duration: 320, ease: 'Cubic.easeOut',
+    });
+    this._xpOrbsList = this._xpOrbsList || [];
+    this._xpOrbsList.push(orb);
+  }
+
+  _updateXpOrbs(delta) {
+    if (!this._xpOrbsList || this._xpOrbsList.length === 0) return;
+    const px = this.player.x, py = this.player.y;
+    const magnetMult = (this._boonState?.magnetMult || 1);
+    const magnetR = this._magnetRadiusBase * magnetMult;
+    const collectR = 18;
+
+    for (let i = this._xpOrbsList.length - 1; i >= 0; i--) {
+      const orb = this._xpOrbsList[i];
+      if (!orb || !orb.active) { this._xpOrbsList.splice(i, 1); continue; }
+      const dx = px - orb.x, dy = py - orb.y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d < collectR) {
+        // Collect — apply XP, destroy orb
+        this._gainXp(orb.value);
+        if (orb._halo) orb._halo.destroy();
+        orb.destroy();
+        this._xpOrbsList.splice(i, 1);
+        audio.pickup();
+        continue;
+      }
+      if (d < magnetR) {
+        // Magnet pull
+        const speed = 240 + (magnetR - d) * 4;
+        const nx = dx / d, ny = dy / d;
+        orb.x += nx * speed * (delta / 1000);
+        orb.y += ny * speed * (delta / 1000);
+        if (orb._halo) { orb._halo.x = orb.x; orb._halo.y = orb.y; }
+      }
+    }
+  }
+
+  _gainXp(amount) {
+    const xpMult = this._boonState?.xpMult || 1;
+    this._xp += amount * xpMult;
+    if (this._xpBarFill) this._refreshXpBar();
+    while (this._xp >= this._xpToNext && !this._levelUpActive) {
+      this._presentLevelUp();
+      break; // wait for player to choose
+    }
+  }
+
+  _refreshXpBar() {
+    if (!this._xpBarFill) return;
+    const span = this._xpToNext - this._xpToCurrent;
+    const inLevel = this._xp - this._xpToCurrent;
+    const ratio = Math.min(1, Math.max(0, inLevel / span));
+    const W = this.scale.width;
+    this._xpBarFill.clear();
+    this._xpBarFill.fillStyle(0x66AAFF, 1).fillRect(0, this.scale.height - 6, W * ratio, 4);
+    this._xpBarFill.fillStyle(0xCCEEFF, 0.4).fillRect(0, this.scale.height - 6, W * ratio, 1.5);
+    if (this._levelText) this._levelText.setText(`LV ${this._level}`);
+  }
+
+  _presentLevelUp() {
+    if (this._levelUpActive) return;
+    this._levelUpActive = true;
+    this._level += 1;
+    this._xpToCurrent = this._xpToNext;
+    this._xpToNext = xpToLevel(this._level + 1);
+    this.physics.pause();
+    audio.bossDeath();
+    shakeNormal(this);
+
+    const W = this.scale.width, H = this.scale.height;
+    const layer = this.add.container(0, 0).setDepth(220).setScrollFactor(0);
+    const ov = this.add.graphics();
+    ov.fillStyle(0x000000, 0).fillRect(0, 0, W, H);
+    layer.add(ov);
+    this.tweens.add({ targets: ov, fillAlpha: 0.78, duration: 400 });
+
+    const title = this.add.text(W / 2, H * 0.18, `LEVEL ${this._level}`, {
+      fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '40px',
+      color: '#FFD66B', fontStyle: 'bold', letterSpacing: 8,
+      stroke: '#000', strokeThickness: 4,
+      shadow: { offsetX: 0, offsetY: 0, color: '#FFB45A', blur: 18, fill: true },
+    }).setOrigin(0.5).setAlpha(0);
+    layer.add(title);
+    this.tweens.add({ targets: title, alpha: 1, scale: { from: 0.6, to: 1 }, duration: 500, ease: 'Back.easeOut' });
+
+    const sub = this.add.text(W / 2, H * 0.27, 'Wähle einen Vers, einen Pakt, eine Wahrheit.', {
+      fontFamily: "'Lora', serif", fontStyle: 'italic',
+      fontSize: '13px', color: '#a89888',
+    }).setOrigin(0.5).setAlpha(0);
+    layer.add(sub);
+    this.tweens.add({ targets: sub, alpha: 1, duration: 500, delay: 200 });
+
+    const choices = rollLevelupChoice(this._level);
+    const cw = Math.min(240, Math.floor((W - 100) / 3));
+    const ch = 170;
+    const gap = 16;
+    const totalW = 3 * cw + 2 * gap;
+    const startX = W / 2 - totalW / 2 + cw / 2;
+    const cardsY = H * 0.58;
+
+    choices.forEach((boon, i) => {
+      const cx = startX + i * (cw + gap);
+      const ry = cardsY - ch / 2;
+      const rx = cx - cw / 2;
+      const tierColor = boon.tier === 2 ? 0xFFD66B : 0xcc88ff;
+      const bg = this.add.graphics();
+      const draw = (hover) => {
+        bg.clear();
+        bg.fillStyle(hover ? 0x2A1F3A : 0x0E0A18, 0.95)
+          .fillRoundedRect(rx, ry, cw, ch, 10);
+        bg.lineStyle(hover ? 3 : 2, hover ? 0xFFD66B : tierColor,
+                    hover ? 0.95 : 0.8)
+          .strokeRoundedRect(rx, ry, cw, ch, 10);
+      };
+      draw(false);
+      const tierBadge = this.add.text(rx + 10, ry + 8, boon.tier === 2 ? '★★' : '★', {
+        fontFamily: "'Cinzel', serif", fontSize: '13px',
+        color: boon.tier === 2 ? '#FFD66B' : '#cc88ff', fontStyle: 'bold',
+      }).setDepth(221);
+      const name = this.add.text(cx, ry + 38, boon.name, {
+        fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '16px',
+        fontStyle: 'bold',
+        color: '#' + tierColor.toString(16).padStart(6, '0'),
+        align: 'center', wordWrap: { width: cw - 18 },
+      }).setOrigin(0.5, 0);
+      const desc = this.add.text(cx, ry + 84, boon.desc, {
+        fontFamily: "'Lora', serif", fontSize: '12px',
+        color: '#e0d8c0', align: 'center', wordWrap: { width: cw - 22 },
+        lineSpacing: 3,
+      }).setOrigin(0.5, 0);
+      const hit = this.add.rectangle(cx, cardsY, cw + 12, ch + 12, 0x000000, 0)
+        .setInteractive({ useHandCursor: true });
+      hit.on('pointerover', () => draw(true));
+      hit.on('pointerout', () => draw(false));
+      hit.on('pointerdown', () => this._chooseLevelUpBoon(boon, layer));
+
+      layer.add([bg, tierBadge, name, desc, hit]);
+      [bg, tierBadge, name, desc].forEach(o => o.setAlpha(0));
+      this.tweens.add({
+        targets: [bg, tierBadge, name, desc],
+        alpha: 1, duration: 400, delay: 600 + i * 180,
+      });
+    });
+  }
+
+  _chooseLevelUpBoon(boon, layer) {
+    this._boonState = this._boonState || {
+      dmgMult: 1, spdMult: 1, cdMult: 1, swirlCdMult: 1, swirlDmgMult: 1,
+      maxHpMult: 1, maxHpBonus: 0, comboDecayMult: 1, comboCap: 3.0,
+      critBonus: 0, healOnCrit: 0, healOnKill: 0, magnetMult: 1, xpMult: 1,
+      healOnApply: 0, doubleCast: false,
+    };
+    boon.apply(this._boonState);
+    this._applyBoonStateToPlayer();
+    // Visual flash on player
+    const ring = this.add.circle(this.player.x, this.player.y, 12, 0xFFD66B, 0)
+      .setStrokeStyle(3, 0xFFD66B, 1).setDepth(28);
+    this.tweens.add({
+      targets: ring, radius: 140, alpha: 0,
+      duration: 800, ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
+    });
+    this.tweens.add({
+      targets: layer.list, alpha: 0, duration: 400,
+      onComplete: () => {
+        layer.destroy();
+        this.physics.resume();
+        this._levelUpActive = false;
+        this._refreshXpBar();
+      },
+    });
+  }
+
   _showOnboarding() {
     const W = this.scale.width, H = this.scale.height;
     const ov = this.add.graphics().setDepth(180).setScrollFactor(0);
@@ -925,6 +1142,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this._updateHpBar();
     this._updateEnemies(delta);
     this._updateCooldownBars();
+    this._updateXpOrbs(delta);
   }
 
   _updateHpBar() {
@@ -1196,6 +1414,18 @@ export default class SkaldenliedScene extends Phaser.Scene {
       this._killText.setText(`${this._totalKills} Gefallen`);
       this.skaldenlied.onEnemyKilled(e);
       audio.pickup();
+      // Heal-on-kill boon
+      const healOnKill = this._boonState?.healOnKill || 0;
+      if (healOnKill > 0 && this.player.hp > 0) {
+        this.player.hp = Math.min(this.player.maxHp, this.player.hp + healOnKill);
+      }
+      // XP drop — bigger enemies drop more
+      let xpValue = 1;
+      if (e.kind === 'warrior')   xpValue = 3;
+      if (e.kind === 'fenrir')    xpValue = 2;
+      if (e.kind === 'skinwalker') xpValue = 2;
+      if (wasBoss)                xpValue = 25;
+      this._spawnXpOrbs(e.x, e.y, xpValue);
 
       if (wasBoss) {
         this._bossActive = false;
