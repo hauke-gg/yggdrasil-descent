@@ -252,12 +252,20 @@ export default class Skaldenlied {
   }
 
   _spawnStrike(x, y, damage) {
-    // Speerwurf: a long spear sprite flies toward the target with a fading trail
+    // Speerwurf: a long spear sprite flies in the skald's facing direction —
+    // NO auto-aim. The player decides where to aim by facing.
     const scene = this.scene;
-    const target = this._nearestEnemy(x, y);
-    if (!target) return;
-    const angle = Math.atan2(target.y - y, target.x - x);
-    const distance = Math.hypot(target.x - x, target.y - y);
+    // Direction from facing (default right), with velocity bias if moving
+    const facing = scene._playerFacing || 1;
+    let angle = facing > 0 ? 0 : Math.PI;
+    if (scene.player && scene.player.body) {
+      const vx = scene.player.body.velocity.x;
+      const vy = scene.player.body.velocity.y;
+      if (Math.abs(vx) > 5 || Math.abs(vy) > 5) {
+        angle = Math.atan2(vy, vx);
+      }
+    }
+    const distance = 500;
 
     // Spear: long thin gradient shape
     const spear = scene.add.graphics().setDepth(45);

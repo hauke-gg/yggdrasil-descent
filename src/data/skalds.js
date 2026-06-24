@@ -16,7 +16,7 @@ export const SKALDS = {
     trauma:
       'Er hat seinen jüngeren Bruder mit eigener Klinge erstochen, weil der Junge in Panik schrie und die Stellung verriet.',
     stats: { hp: 130, dmg: 1.15, spd: 200 },
-    statLabel: 'HP +30  ·  Schaden ×1.15  ·  Geschwindigkeit normal',
+    statLabel: 'HP +30 · Schaden ×1.15\nGeschwindigkeit normal',
   },
   solveig: {
     id: 'solveig',
@@ -30,7 +30,7 @@ export const SKALDS = {
     trauma:
       'Drei Tropfen Eisenhutwurzel in der Suppe, dreimal Atem anhalten, dreimal ein Lied summen, bis die Köpfe in den Schalen lagen.',
     stats: { hp: 80, dmg: 1.0, spd: 260 },
-    statLabel: 'HP −20  ·  Schaden ×1.0  ·  Geschwindigkeit +30%',
+    statLabel: 'HP −20 · Schaden ×1.0\nGeschwindigkeit +30%',
   },
   brandr: {
     id: 'brandr',
@@ -44,7 +44,7 @@ export const SKALDS = {
     trauma:
       'Er hat Naudhiz auf den Stab seiner Mutter geritzt — sie heilte, drei Tage später starb sein Vater am gleichen Husten.',
     stats: { hp: 70, dmg: 1.4, spd: 200 },
-    statLabel: 'HP −30  ·  Schaden ×1.4  ·  Geschwindigkeit normal',
+    statLabel: 'HP −30 · Schaden ×1.4\nGeschwindigkeit normal',
   },
 };
 

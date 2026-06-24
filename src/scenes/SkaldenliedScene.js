@@ -305,9 +305,16 @@ export default class SkaldenliedScene extends Phaser.Scene {
       color: '#66AAFF', fontStyle: 'bold',
     }).setOrigin(1, 0).setDepth(82).setScrollFactor(0);
 
-    // XP bar at the bottom (above the action buttons)
+    // XP bar at the TOP edge (under the HUD strip, very visible)
+    const xpBarY = 46;
+    const xpBarH = 8;
+    this._xpBarY = xpBarY;
+    this._xpBarH = xpBarH;
     this._xpBarBg = this.add.graphics().setDepth(81).setScrollFactor(0);
-    this._xpBarBg.fillStyle(0x1A0F2A, 0.85).fillRect(0, H - 6, W, 4);
+    this._xpBarBg.fillStyle(0x0E1428, 0.9).fillRect(0, xpBarY, W, xpBarH);
+    this._xpBarBg.lineStyle(1, 0x66AAFF, 0.45)
+      .lineBetween(0, xpBarY, W, xpBarY)
+      .lineBetween(0, xpBarY + xpBarH, W, xpBarY + xpBarH);
     this._xpBarFill = this.add.graphics().setDepth(82).setScrollFactor(0);
 
     // Center title
@@ -751,7 +758,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
       const cx = cardsStartX + i * (cw + cgap);
       const ry = cardsY - ch / 2;
       const rx = cx - cw / 2;
-      const bg = this.add.graphics();
+      const bg = this.add.graphics().setScrollFactor(0).setDepth(221);
       const draw = (hover) => {
         bg.clear();
         bg.fillStyle(hover ? 0x2A1F3A : 0x0E0A18, 0.95)
@@ -765,15 +772,16 @@ export default class SkaldenliedScene extends Phaser.Scene {
       const cardName = this.add.text(cx, ry + 20, boon.name, {
         fontFamily: "'Cinzel', serif", fontSize: '15px', fontStyle: 'bold',
         color: god.color, align: 'center', wordWrap: { width: cw - 16 },
-      }).setOrigin(0.5, 0);
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(222);
       const cardDesc = this.add.text(cx, ry + 62, boon.description, {
         fontFamily: "'Lora', serif", fontSize: '12px',
         color: '#e0d8c0', align: 'center', wordWrap: { width: cw - 22 },
         lineSpacing: 3,
-      }).setOrigin(0.5, 0);
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(222);
       // Larger tap zone with padding for mobile thumbs
-      const hit = this.add.rectangle(cx, cardsY, cw + 12, ch + 12, 0x000000, 0)
-        .setInteractive({ useHandCursor: true });
+      const hit = this.add.rectangle(cx, cardsY, cw + 20, ch + 20, 0x000000, 0)
+        .setInteractive({ useHandCursor: true })
+        .setScrollFactor(0).setDepth(223);
       hit.on('pointerover', () => draw(true));
       hit.on('pointerout', () => draw(false));
       hit.on('pointerdown', () => this._chooseBoon(boon, layer));
@@ -917,10 +925,24 @@ export default class SkaldenliedScene extends Phaser.Scene {
     const inLevel = this._xp - this._xpToCurrent;
     const ratio = Math.min(1, Math.max(0, inLevel / span));
     const W = this.scale.width;
+    const y = this._xpBarY || 46;
+    const h = this._xpBarH || 8;
     this._xpBarFill.clear();
-    this._xpBarFill.fillStyle(0x66AAFF, 1).fillRect(0, this.scale.height - 6, W * ratio, 4);
-    this._xpBarFill.fillStyle(0xCCEEFF, 0.4).fillRect(0, this.scale.height - 6, W * ratio, 1.5);
+    if (ratio > 0) {
+      this._xpBarFill.fillStyle(0x66AAFF, 1).fillRect(0, y, W * ratio, h);
+      this._xpBarFill.fillStyle(0xCCEEFF, 0.5).fillRect(0, y, W * ratio, 2);
+      this._xpBarFill.fillStyle(0xFFFFFF, 0.9).fillRect(W * ratio - 2, y - 1, 2, h + 2);
+    }
     if (this._levelText) this._levelText.setText(`LV ${this._level}`);
+    // Pulse the level text briefly
+    if (this._levelText && this._lastShownXp !== this._xp) {
+      this._lastShownXp = this._xp;
+      this.tweens.add({
+        targets: this._levelText,
+        scale: { from: 1, to: 1.2 },
+        duration: 120, yoyo: true,
+      });
+    }
   }
 
   _presentLevelUp() {
@@ -969,7 +991,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
       const ry = cardsY - ch / 2;
       const rx = cx - cw / 2;
       const tierColor = boon.tier === 2 ? 0xFFD66B : 0xcc88ff;
-      const bg = this.add.graphics();
+      const bg = this.add.graphics().setScrollFactor(0).setDepth(221);
       const draw = (hover) => {
         bg.clear();
         bg.fillStyle(hover ? 0x2A1F3A : 0x0E0A18, 0.95)
@@ -982,20 +1004,21 @@ export default class SkaldenliedScene extends Phaser.Scene {
       const tierBadge = this.add.text(rx + 10, ry + 8, boon.tier === 2 ? '★★' : '★', {
         fontFamily: "'Cinzel', serif", fontSize: '13px',
         color: boon.tier === 2 ? '#FFD66B' : '#cc88ff', fontStyle: 'bold',
-      }).setDepth(221);
+      }).setScrollFactor(0).setDepth(222);
       const name = this.add.text(cx, ry + 38, boon.name, {
         fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '16px',
         fontStyle: 'bold',
         color: '#' + tierColor.toString(16).padStart(6, '0'),
         align: 'center', wordWrap: { width: cw - 18 },
-      }).setOrigin(0.5, 0);
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(222);
       const desc = this.add.text(cx, ry + 84, boon.desc, {
         fontFamily: "'Lora', serif", fontSize: '12px',
         color: '#e0d8c0', align: 'center', wordWrap: { width: cw - 22 },
         lineSpacing: 3,
-      }).setOrigin(0.5, 0);
-      const hit = this.add.rectangle(cx, cardsY, cw + 12, ch + 12, 0x000000, 0)
-        .setInteractive({ useHandCursor: true });
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(222);
+      const hit = this.add.rectangle(cx, cardsY, cw + 20, ch + 20, 0x000000, 0)
+        .setInteractive({ useHandCursor: true })
+        .setScrollFactor(0).setDepth(223);
       hit.on('pointerover', () => draw(true));
       hit.on('pointerout', () => draw(false));
       hit.on('pointerdown', () => this._chooseLevelUpBoon(boon, layer));

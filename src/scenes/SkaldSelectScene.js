@@ -96,7 +96,7 @@ export default class SkaldSelectScene extends Phaser.Scene {
     const dividerY = epithetY + 16;
     const traumaY = dividerY + 10;
     // Stats sit INSIDE the card with breathing room above and below
-    const statsY = ry + h - 24;
+    const statsY = ry + h - 18;
 
     // Name
     const name = this.add.text(cx, nameY, skald.name, {

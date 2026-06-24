@@ -28,15 +28,19 @@
     }
     #game-container {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      width: 100dvw;
+      height: 100dvh;
       background: #06000f;
+      overflow: hidden;
     }
     #game-container canvas {
       display: block;
       touch-action: none;
+      width: 100% !important;
+      height: 100% !important;
     }
 
     /* Drehen-Overlay für Portrait */
