@@ -440,18 +440,18 @@ export default class SkaldenliedScene extends Phaser.Scene {
     audio.stopCombatPulse();
 
     const W = this.scale.width, H = this.scale.height;
-    const layer = this.add.container(0, 0).setDepth(230).setScrollFactor(0);
+    const layer = { list: [] };
     this._pauseLayer = layer;
     const ov = this.add.graphics().setScrollFactor(0).setDepth(230);
     ov.fillStyle(0x000000, 0.78).fillRect(0, 0, W, H);
-    layer.add(ov);
+    layer.list.push(ov);
 
     const title = this.add.text(W / 2, H * 0.28, 'PAUSE', {
       fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '46px',
       color: '#FFD66B', fontStyle: 'bold', letterSpacing: 10,
       stroke: '#000', strokeThickness: 4,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(232);
-    layer.add(title);
+    layer.list.push(title);
 
     const settings = loadSettings();
     const muted = !!settings.muted;
@@ -490,7 +490,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
       hit.on('pointerover', () => { draw(true); label.setColor('#FFD66B'); });
       hit.on('pointerout', () => { draw(false); label.setColor('#e8dcc0'); });
       hit.on('pointerdown', () => btn.click());
-      layer.add([bg, label, hit]);
+      layer.list.push(bg, label, hit);
     });
 
     // Best-run summary
@@ -501,14 +501,18 @@ export default class SkaldenliedScene extends Phaser.Scene {
         fontFamily: "'Space Mono', monospace", fontSize: '11px',
         color: '#7a7080', letterSpacing: 1,
       }).setOrigin(0.5).setScrollFactor(0).setDepth(232);
-      layer.add(bestText);
+      layer.list.push(bestText);
     }
   }
 
   _resumeGame() {
     if (!this._paused) return;
     this._paused = false;
-    if (this._pauseLayer) { this._pauseLayer.destroy(); this._pauseLayer = null; }
+    if (this._pauseLayer) {
+      this._pauseLayer.list.forEach(o => o?.destroy?.());
+      this._pauseLayer.list = [];
+      this._pauseLayer = null;
+    }
     this.physics.resume();
     audio.startCombatPulse();
   }
@@ -800,11 +804,11 @@ export default class SkaldenliedScene extends Phaser.Scene {
 
     const god = GODS[godId] || GODS.loki;
     const W = this.scale.width, H = this.scale.height;
-    const layer = this.add.container(0, 0).setDepth(220).setScrollFactor(0);
+    const layer = { list: [] };
 
-    const ov = this.add.graphics();
+    const ov = this.add.graphics().setScrollFactor(0).setDepth(220);
     ov.fillStyle(0x000000, 0).fillRect(0, 0, W, H);
-    layer.add(ov);
+    layer.list.push(ov);
     this.tweens.add({ targets: ov, fillAlpha: 0.78, duration: 600 });
 
     // God portrait left
@@ -812,8 +816,8 @@ export default class SkaldenliedScene extends Phaser.Scene {
     if (this.textures.exists(god.portrait)) {
       const cleanKey = makeBlackTransparent(this, god.portrait);
       portrait = this.add.image(W * 0.25, H * 0.5, cleanKey)
-        .setDisplaySize(H * 0.7, H * 0.7).setAlpha(0);
-      layer.add(portrait);
+        .setDisplaySize(H * 0.7, H * 0.7).setScrollFactor(0).setDepth(221).setAlpha(0);
+      layer.list.push(portrait);
       this.tweens.add({ targets: portrait, alpha: 1, duration: 900, delay: 200 });
     }
 
@@ -822,23 +826,23 @@ export default class SkaldenliedScene extends Phaser.Scene {
       fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '38px',
       color: god.color, fontStyle: 'bold', letterSpacing: 8,
       stroke: '#000', strokeThickness: 4,
-    }).setOrigin(0, 0).setAlpha(0);
-    layer.add(name);
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(222).setAlpha(0);
+    layer.list.push(name);
     this.tweens.add({ targets: name, alpha: 1, duration: 700, delay: 600 });
 
     const title = this.add.text(W * 0.58, H * 0.27, god.title, {
       fontFamily: "'Lora', serif", fontSize: '14px', fontStyle: 'italic',
       color: '#a89888',
-    }).setOrigin(0, 0).setAlpha(0);
-    layer.add(title);
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(222).setAlpha(0);
+    layer.list.push(title);
     this.tweens.add({ targets: title, alpha: 1, duration: 700, delay: 900 });
 
     const mono = this.add.text(W * 0.58, H * 0.34, '„' + god.monologue + '"', {
       fontFamily: "'Lora', serif", fontSize: '15px',
       color: '#e8dcc0', wordWrap: { width: W * 0.36 },
       lineSpacing: 4, fontStyle: 'italic',
-    }).setOrigin(0, 0).setAlpha(0);
-    layer.add(mono);
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(222).setAlpha(0);
+    layer.list.push(mono);
     this.tweens.add({ targets: mono, alpha: 1, duration: 800, delay: 1300 });
 
     // 3 boon cards — centered horizontally across the full width, plenty of space
@@ -883,7 +887,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
       hit.on('pointerout', () => draw(false));
       hit.on('pointerdown', () => this._chooseBoon(boon, layer));
 
-      layer.add([bg, cardName, cardDesc, hit]);
+      layer.list.push(bg, cardName, cardDesc, hit);
       [bg, cardName, cardDesc].forEach(o => o.setAlpha(0));
       this.tweens.add({ targets: [bg, cardName, cardDesc], alpha: 1, duration: 500, delay: 1700 + i * 200 });
     });
@@ -905,7 +909,8 @@ export default class SkaldenliedScene extends Phaser.Scene {
       targets: layer.list,
       alpha: 0, duration: 500,
       onComplete: () => {
-        layer.destroy();
+        layer.list.forEach(o => o?.destroy?.());
+        layer.list = [];
         this.physics.resume();
         this._boonActive = false;
       },
@@ -1129,10 +1134,10 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this._chestBoonActive = true;
     this.physics.pause();
     const W = this.scale.width, H = this.scale.height;
-    const layer = this.add.container(0, 0).setDepth(220).setScrollFactor(0);
-    const ov = this.add.graphics();
+    const layer = { list: [] };
+    const ov = this.add.graphics().setScrollFactor(0).setDepth(220);
     ov.fillStyle(0x000000, 0).fillRect(0, 0, W, H);
-    layer.add(ov);
+    layer.list.push(ov);
     this.tweens.add({ targets: ov, fillAlpha: 0.82, duration: 500 });
 
     const title = this.add.text(W / 2, H * 0.18, 'TRUHE', {
@@ -1141,7 +1146,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
       stroke: '#000', strokeThickness: 4,
       shadow: { offsetX: 0, offsetY: 0, color: '#FFB45A', blur: 20, fill: true },
     }).setOrigin(0.5).setScrollFactor(0).setDepth(222).setAlpha(0);
-    layer.add(title);
+    layer.list.push(title);
     this.tweens.add({ targets: title, alpha: 1, scale: { from: 0.6, to: 1 }, duration: 600, ease: 'Back.easeOut' });
 
     const sub = this.add.text(W / 2, H * 0.27,
@@ -1149,7 +1154,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
       fontFamily: "'Lora', serif", fontStyle: 'italic',
       fontSize: '14px', color: '#a89888',
     }).setOrigin(0.5).setScrollFactor(0).setDepth(222).setAlpha(0);
-    layer.add(sub);
+    layer.list.push(sub);
     this.tweens.add({ targets: sub, alpha: 1, duration: 500, delay: 300 });
 
     const choices = rollChestChoice();
@@ -1193,7 +1198,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
       hit.on('pointerover', () => draw(true));
       hit.on('pointerout', () => draw(false));
       hit.on('pointerdown', () => this._chooseChestBoon(boon, layer));
-      layer.add([bg, tierBadge, name, desc, hit]);
+      layer.list.push(bg, tierBadge, name, desc, hit);
       [bg, tierBadge, name, desc].forEach(o => o.setAlpha(0));
       this.tweens.add({
         targets: [bg, tierBadge, name, desc],
@@ -1222,7 +1227,8 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this.tweens.add({
       targets: layer.list, alpha: 0, duration: 500,
       onComplete: () => {
-        layer.destroy();
+        layer.list.forEach(o => o?.destroy?.());
+        layer.list = [];
         this.physics.resume();
         this._chestBoonActive = false;
       },
@@ -1336,10 +1342,12 @@ export default class SkaldenliedScene extends Phaser.Scene {
     shakeNormal(this);
 
     const W = this.scale.width, H = this.scale.height;
-    const layer = this.add.container(0, 0).setDepth(220).setScrollFactor(0);
-    const ov = this.add.graphics();
+    // Use an array, NOT a Container — Phaser Containers can shift the
+    // hit-area of nested interactive children on some configs.
+    const layer = { list: [], destroy() { this.list.forEach(o => o?.destroy?.()); } };
+    const ov = this.add.graphics().setScrollFactor(0).setDepth(220);
     ov.fillStyle(0x000000, 0).fillRect(0, 0, W, H);
-    layer.add(ov);
+    layer.list.push(ov);
     this.tweens.add({ targets: ov, fillAlpha: 0.78, duration: 400 });
 
     const title = this.add.text(W / 2, H * 0.18, `LEVEL ${this._level}`, {
@@ -1347,15 +1355,15 @@ export default class SkaldenliedScene extends Phaser.Scene {
       color: '#FFD66B', fontStyle: 'bold', letterSpacing: 8,
       stroke: '#000', strokeThickness: 4,
       shadow: { offsetX: 0, offsetY: 0, color: '#FFB45A', blur: 18, fill: true },
-    }).setOrigin(0.5).setAlpha(0);
-    layer.add(title);
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(222).setAlpha(0);
+    layer.list.push(title);
     this.tweens.add({ targets: title, alpha: 1, scale: { from: 0.6, to: 1 }, duration: 500, ease: 'Back.easeOut' });
 
     const sub = this.add.text(W / 2, H * 0.27, 'Wähle einen Vers, einen Pakt, eine Wahrheit.', {
       fontFamily: "'Lora', serif", fontStyle: 'italic',
       fontSize: '13px', color: '#a89888',
-    }).setOrigin(0.5).setAlpha(0);
-    layer.add(sub);
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(222).setAlpha(0);
+    layer.list.push(sub);
     this.tweens.add({ targets: sub, alpha: 1, duration: 500, delay: 200 });
 
     const choices = rollLevelupChoice(this._level);
@@ -1403,7 +1411,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
       hit.on('pointerout', () => draw(false));
       hit.on('pointerdown', () => this._chooseLevelUpBoon(boon, layer));
 
-      layer.add([bg, tierBadge, name, desc, hit]);
+      layer.list.push(bg, tierBadge, name, desc, hit);
       [bg, tierBadge, name, desc].forEach(o => o.setAlpha(0));
       this.tweens.add({
         targets: [bg, tierBadge, name, desc],
@@ -1433,7 +1441,8 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this.tweens.add({
       targets: layer.list, alpha: 0, duration: 400,
       onComplete: () => {
-        layer.destroy();
+        layer.list.forEach(o => o?.destroy?.());
+        layer.list = [];
         this.physics.resume();
         this._levelUpActive = false;
         this._refreshXpBar();

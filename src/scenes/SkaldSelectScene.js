@@ -95,8 +95,10 @@ export default class SkaldSelectScene extends Phaser.Scene {
     const epithetY = nameY + 20;
     const dividerY = epithetY + 16;
     const traumaY = dividerY + 10;
-    // Stats sit INSIDE the card with breathing room above and below
-    const statsY = ry + h - 18;
+    // Reserve a fixed band at the bottom of the card for the stats
+    const statsBandH = 36;
+    const statsY = ry + h - 12;
+    const traumaMaxH = Math.max(40, statsY - statsBandH - traumaY - 12);
 
     // Name
     const name = this.add.text(cx, nameY, skald.name, {
@@ -116,20 +118,20 @@ export default class SkaldSelectScene extends Phaser.Scene {
     div.lineStyle(1, 0xC9A961, 0.4)
       .lineBetween(rx + 30, dividerY, rx + w - 30, dividerY);
 
-    // Trauma — limit to 4 lines, ellipsis if longer
+    // Trauma — clipped to the available band; 3 lines max
     const trauma = this.add.text(cx, traumaY, skald.trauma, {
-      fontFamily: "'Lora', serif", fontSize: '10.5px',
+      fontFamily: "'Lora', serif", fontSize: '11px',
       color: '#cdb8a8', align: 'center',
-      wordWrap: { width: w - 30 }, lineSpacing: 3,
-      maxLines: 4,
+      wordWrap: { width: w - 30 }, lineSpacing: 4,
+      maxLines: 3,
+      fixedHeight: traumaMaxH,
     }).setOrigin(0.5, 0).setDepth(5);
 
-    // Stats — anchored to the BOTTOM of the card (origin 0.5, 1) so they
-    // always stay inside the card frame regardless of trauma length
+    // Stats — bottom-anchored (origin 0.5, 1) with a clear gap above
     const stats = this.add.text(cx, statsY, skald.statLabel, {
-      fontFamily: "'Space Mono', monospace", fontSize: '10px',
+      fontFamily: "'Space Mono', monospace", fontSize: '11px',
       color: CSS_COLORS.purpleLight, letterSpacing: 1, align: 'center',
-      wordWrap: { width: w - 20 }, lineSpacing: 2,
+      lineSpacing: 3,
     }).setOrigin(0.5, 1).setDepth(5);
 
     // Interactive overlay

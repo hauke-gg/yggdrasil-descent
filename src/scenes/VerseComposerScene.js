@@ -153,15 +153,15 @@ export default class VerseComposerScene extends Phaser.Scene {
 
     // Name
     const name = this.add.text(cx, ry + 14, lib.name, {
-      fontFamily: "'Cinzel', serif", fontSize: '13px',
+      fontFamily: "'Cinzel', serif", fontSize: '15px',
       color: stabCss, fontStyle: 'bold',
     }).setOrigin(0.5, 0).setDepth(3);
 
     // Description
-    const desc = this.add.text(cx, ry + 38, lib.description, {
-      fontFamily: "'Lora', serif", fontSize: '10px',
+    const desc = this.add.text(cx, ry + 40, lib.description, {
+      fontFamily: "'Lora', serif", fontSize: '12px',
       color: '#cdb8a8', align: 'center',
-      wordWrap: { width: w - 20 }, lineSpacing: 2,
+      wordWrap: { width: w - 20 }, lineSpacing: 3,
     }).setOrigin(0.5, 0).setDepth(3);
 
     const hit = this.add.rectangle(cx, cy, w, h, 0x000000, 0)

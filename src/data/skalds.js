@@ -14,7 +14,7 @@ export const SKALDS = {
     bodyOffsetX: 360,
     bodyOffsetY: 460,
     trauma:
-      'Er hat seinen jüngeren Bruder mit eigener Klinge erstochen, weil der Junge in Panik schrie und die Stellung verriet.',
+      'Hat seinen Bruder im Gefecht erstochen — eine Sekunde Panik, die nie endet.',
     stats: { hp: 130, dmg: 1.15, spd: 200 },
     statLabel: 'HP +30 · Schaden ×1.15\nGeschwindigkeit normal',
   },
@@ -28,7 +28,7 @@ export const SKALDS = {
     bodyOffsetX: 380,
     bodyOffsetY: 480,
     trauma:
-      'Drei Tropfen Eisenhutwurzel in der Suppe, dreimal Atem anhalten, dreimal ein Lied summen, bis die Köpfe in den Schalen lagen.',
+      'Drei Tropfen Eisenhut in der Suppe. Drei Köpfe in den Schalen. Sie trägt seither keinen Namen mehr.',
     stats: { hp: 80, dmg: 1.0, spd: 260 },
     statLabel: 'HP −20 · Schaden ×1.0\nGeschwindigkeit +30%',
   },
@@ -42,7 +42,7 @@ export const SKALDS = {
     bodyOffsetX: 380,
     bodyOffsetY: 480,
     trauma:
-      'Er hat Naudhiz auf den Stab seiner Mutter geritzt — sie heilte, drei Tage später starb sein Vater am gleichen Husten.',
+      'Ritzte Naudhiz für seine Mutter. Sie heilte. Drei Tage später starb sein Vater am gleichen Husten.',
     stats: { hp: 70, dmg: 1.4, spd: 200 },
     statLabel: 'HP −30 · Schaden ×1.4\nGeschwindigkeit normal',
   },
