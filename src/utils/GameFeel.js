@@ -34,6 +34,10 @@ export function hitPause(scene, ms) {
   const wasRunning = !scene.physics.world.isPaused;
   if (wasRunning) scene.physics.pause();
   scene.tweens.pauseAll();
+  // Vibrate proportional to the hit (mobile only)
+  if (navigator.vibrate) {
+    navigator.vibrate(ms >= FEEL.HIT_PAUSE_CRIT ? 30 : 12);
+  }
   scene.time.delayedCall(ms, () => {
     if (wasRunning) scene.physics.resume();
     scene.tweens.resumeAll();

@@ -32,6 +32,15 @@ export default class BragiIntroScene extends Phaser.Scene {
 
     const W = this.scale.width, H = this.scale.height;
 
+    // If the player has already seen the intro at least once,
+    // skip the whole sequence and jump straight to the skald-pick.
+    let introSeen = false;
+    try { introSeen = localStorage.getItem('ygg_intro_seen') === '1'; } catch {}
+    if (introSeen) {
+      this.scene.start('SkaldSelectScene');
+      return;
+    }
+
     // Black under-layer
     this.add.graphics().fillStyle(0x000000, 1).fillRect(0, 0, W, H);
 

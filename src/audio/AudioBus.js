@@ -21,7 +21,26 @@ class AudioBus {
     this.pickupCounter = 0;
     this.lastPickupAt = 0;
     this._unlocked = false;
+    this._muted = false;
+    try {
+      const s = JSON.parse(localStorage.getItem('ygg_settings') || '{}');
+      this._muted = !!s.muted;
+    } catch {}
   }
+
+  setMuted(muted) {
+    this._muted = muted;
+    if (this._unlocked && this.master) {
+      this.master.gain.setValueAtTime(muted ? 0 : 0.7, this.ctx.currentTime);
+    }
+    try {
+      const s = JSON.parse(localStorage.getItem('ygg_settings') || '{}');
+      s.muted = muted;
+      localStorage.setItem('ygg_settings', JSON.stringify(s));
+    } catch {}
+  }
+
+  isMuted() { return this._muted; }
 
   unlock() {
     if (this._unlocked) return;
@@ -35,7 +54,7 @@ class AudioBus {
     this.compressor.attack.value = 0.003;
     this.compressor.release.value = 0.25;
     this.master = this.ctx.createGain();
-    this.master.gain.value = 0.7;
+    this.master.gain.value = this._muted ? 0 : 0.7;
     this.sfxGain = this.ctx.createGain();
     this.sfxGain.gain.value = 0.8;
     this.musicGain = this.ctx.createGain();

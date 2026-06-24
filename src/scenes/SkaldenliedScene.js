@@ -18,6 +18,7 @@ import { GODS, BOON_LIBRARY, rollBoonChoice } from '../data/boons.js';
 import { LEVELUP_BOONS, rollLevelupChoice, xpToLevel } from '../data/levelupBoons.js';
 import { ITEM_TYPES, rollItemDrop, bossItemDrop } from '../data/items.js';
 import { CHEST_BOONS, rollChestChoice } from '../data/chestBoons.js';
+import { loadBestRun, mergeBestRun, loadSettings, saveSettings, markIntroSeen } from '../utils/Persist.js';
 import { isMobile } from '../utils/MobileDetect.js';
 import VirtualJoystick from '../ui/VirtualJoystick.js';
 import { makeBlackTransparent } from '../utils/SpritePostprocess.js';
@@ -92,8 +93,9 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this._showOnboarding();
 
     // Input — auto-cast handles verses now; SPACE keeps the manual swirl
-    this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,SPACE');
-    this.input.keyboard.on('keydown-ESC', () => this._returnToMenu());
+    this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,SPACE,P');
+    this.input.keyboard.on('keydown-ESC', () => this._togglePause());
+    this.input.keyboard.on('keydown-P', () => this._togglePause());
     this.input.keyboard.on('keydown-SPACE', () => this._trySwirl());
 
     // Spawner — three corners, escalating rate
@@ -121,6 +123,14 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this._magnetRadiusBase = 90;
     this._itemsList = [];
     this._chestsList = [];
+
+    // Run-stat tracker for the game-over screen
+    this._runStats = {
+      bossKilledThisRun: false,
+      chestsOpened: 0,
+      boonsChosen: 0,
+      itemsCollected: 0,
+    };
 
     // Projectile-enemy overlap
     this.physics.world.on('worldstep', () => this._updateProjectiles());
@@ -409,15 +419,98 @@ export default class SkaldenliedScene extends Phaser.Scene {
     this._verseTexts = [];
     this._cooldownBars = [];
 
-    // ESC / Back hint — top-right corner to avoid clash with action bar
-    const escLabel = isMobile(this) ? '✕ Menü' : 'ESC = Menü';
-    const escText = this.add.text(W - 12, 50, escLabel, {
-      fontFamily: "'Space Mono', monospace", fontSize: '10px', color: '#7a7080',
+    // Pause button — top-right, tap-friendly
+    const pauseLabel = isMobile(this) ? '⏸' : 'ESC = Pause';
+    const pauseSize = isMobile(this) ? '20px' : '11px';
+    const pauseBtn = this.add.text(W - 14, 56, pauseLabel, {
+      fontFamily: "'Cinzel', serif", fontSize: pauseSize,
+      color: '#C9A961', fontStyle: 'bold',
     }).setOrigin(1, 0).setDepth(83).setScrollFactor(0);
-    if (isMobile(this)) {
-      escText.setInteractive({ useHandCursor: true });
-      escText.on('pointerdown', () => this._returnToMenu());
+    pauseBtn.setInteractive({ useHandCursor: true });
+    pauseBtn.on('pointerdown', () => this._togglePause());
+  }
+
+  _togglePause() {
+    if (this._levelUpActive || this._chestBoonActive || this._boonActive || this._paused) {
+      if (this._paused) this._resumeGame();
+      return;
     }
+    this._paused = true;
+    this.physics.pause();
+    audio.stopCombatPulse();
+
+    const W = this.scale.width, H = this.scale.height;
+    const layer = this.add.container(0, 0).setDepth(230).setScrollFactor(0);
+    this._pauseLayer = layer;
+    const ov = this.add.graphics().setScrollFactor(0).setDepth(230);
+    ov.fillStyle(0x000000, 0.78).fillRect(0, 0, W, H);
+    layer.add(ov);
+
+    const title = this.add.text(W / 2, H * 0.28, 'PAUSE', {
+      fontFamily: "'Cinzel Decorative', 'Cinzel', serif", fontSize: '46px',
+      color: '#FFD66B', fontStyle: 'bold', letterSpacing: 10,
+      stroke: '#000', strokeThickness: 4,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(232);
+    layer.add(title);
+
+    const settings = loadSettings();
+    const muted = !!settings.muted;
+
+    const btnW = 280, btnH = 56, gap = 14;
+    const baseY = H * 0.46;
+    const buttons = [
+      { label: 'Weiter spielen', click: () => this._resumeGame() },
+      { label: muted ? '🔇 Sound: AUS' : '🔊 Sound: AN',
+        click: () => {
+          const cur = !!loadSettings().muted;
+          audio.setMuted(!cur);
+          this._togglePause(); this._togglePause();
+        } },
+      { label: 'Hauptmenü', click: () => { this._resumeGame(); this._returnToMenu(); } },
+    ];
+
+    buttons.forEach((btn, i) => {
+      const bx = W / 2, by = baseY + i * (btnH + gap);
+      const bg = this.add.graphics().setScrollFactor(0).setDepth(232);
+      const draw = (hover) => {
+        bg.clear();
+        bg.fillStyle(hover ? 0x2A1F3A : 0x1A0F2A, 0.95)
+          .fillRoundedRect(bx - btnW / 2, by - btnH / 2, btnW, btnH, 12);
+        bg.lineStyle(2, hover ? 0xFFD66B : 0x6a5a7e, hover ? 0.95 : 0.7)
+          .strokeRoundedRect(bx - btnW / 2, by - btnH / 2, btnW, btnH, 12);
+      };
+      draw(false);
+      const label = this.add.text(bx, by, btn.label, {
+        fontFamily: "'Cinzel', serif", fontSize: '16px',
+        color: '#e8dcc0', fontStyle: 'bold', letterSpacing: 2,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(233);
+      const hit = this.add.rectangle(bx, by, btnW + 20, btnH + 20, 0x000000, 0)
+        .setInteractive({ useHandCursor: true })
+        .setScrollFactor(0).setDepth(234);
+      hit.on('pointerover', () => { draw(true); label.setColor('#FFD66B'); });
+      hit.on('pointerout', () => { draw(false); label.setColor('#e8dcc0'); });
+      hit.on('pointerdown', () => btn.click());
+      layer.add([bg, label, hit]);
+    });
+
+    // Best-run summary
+    const best = loadBestRun();
+    if (best && (best.runs || 0) > 0) {
+      const bestText = this.add.text(W / 2, H * 0.86,
+        `BESTE: Welle ${best.wave || 0} · ${best.kills || 0} Gefallen · ${best.runs || 0} Versuche`, {
+        fontFamily: "'Space Mono', monospace", fontSize: '11px',
+        color: '#7a7080', letterSpacing: 1,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(232);
+      layer.add(bestText);
+    }
+  }
+
+  _resumeGame() {
+    if (!this._paused) return;
+    this._paused = false;
+    if (this._pauseLayer) { this._pauseLayer.destroy(); this._pauseLayer = null; }
+    this.physics.resume();
+    audio.startCombatPulse();
   }
 
   _verbShort(verbId) {
@@ -902,6 +995,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
         this._collectItem(item.typeId, item.x, item.y);
         item.destroy();
         this._itemsList.splice(i, 1);
+        this._runStats.itemsCollected++;
       }
     }
   }
@@ -1002,6 +1096,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
   _openChest(chest) {
     audio.bossDeath();
     shakeHeavy(this);
+    this._runStats.chestsOpened++;
     // Burst of golden particles
     for (let i = 0; i < 22; i++) {
       const angle = (i / 22) * Math.PI * 2;
@@ -1116,6 +1211,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
     };
     boon.apply(this._boonState);
     this._applyBoonStateToPlayer();
+    this._runStats.boonsChosen++;
     const ring = this.add.circle(this.player.x, this.player.y, 12, 0xFFD66B, 0)
       .setStrokeStyle(4, 0xFFD66B, 1).setDepth(28);
     this.tweens.add({
@@ -1325,6 +1421,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
     };
     boon.apply(this._boonState);
     this._applyBoonStateToPlayer();
+    this._runStats.boonsChosen++;
     // Visual flash on player
     const ring = this.add.circle(this.player.x, this.player.y, 12, 0xFFD66B, 0)
       .setStrokeStyle(3, 0xFFD66B, 1).setDepth(28);
@@ -1748,6 +1845,7 @@ export default class SkaldenliedScene extends Phaser.Scene {
       if (wasBoss) {
         this._bossActive = false;
         this._kingRef = null;
+        this._runStats.bossKilledThisRun = true;
         slowMo(this);
         audio.bossDeath();
         shakeHeavy(this);
@@ -1801,6 +1899,18 @@ export default class SkaldenliedScene extends Phaser.Scene {
   _gameOver() {
     audio.stopCombatPulse();
     audio.stopAmbientDrone();
+    if (navigator.vibrate) navigator.vibrate([100, 60, 250]);
+
+    // Persist best-run + mark intro as seen so future runs can skip Bragi
+    markIntroSeen();
+    const newBest = mergeBestRun({
+      wave: this._waveIndex || 1,
+      kills: this._totalKills || 0,
+      level: this._level || 1,
+      bossKilledThisRun: this._runStats?.bossKilledThisRun || false,
+      skaldId: this._skaldProfile?.id || 'hakon',
+    });
+
     const W = this.scale.width, H = this.scale.height;
 
     // Dim overlay with slow fade-in
@@ -1831,15 +1941,31 @@ export default class SkaldenliedScene extends Phaser.Scene {
       shadow: { offsetX: 0, offsetY: 0, color: '#FFB45A', blur: 12, fill: true },
     }).setOrigin(0.5).setDepth(201).setScrollFactor(0).setAlpha(0);
 
-    // Stats line
+    // Run stats line
+    const bossMark = this._runStats?.bossKilledThisRun ? ' ✓ Boss' : '';
     const stats = this.add.text(
-      W / 2, H * 0.30,
-      `Welle ${this._waveIndex || 1}   ·   ${this._totalKills || 0} Gefallen`,
+      W / 2, H * 0.28,
+      `Welle ${this._waveIndex || 1}   ·   LV ${this._level || 1}   ·   ${this._totalKills || 0} Gefallen${bossMark}`,
       { fontFamily: "'Space Mono', monospace", fontSize: '13px', color: '#a89888' }
     ).setOrigin(0.5).setDepth(201).setScrollFactor(0).setAlpha(0);
 
+    // Detail stats line
+    const r = this._runStats || {};
+    const detail = this.add.text(
+      W / 2, H * 0.34,
+      `${r.chestsOpened || 0} Truhen   ·   ${r.boonsChosen || 0} Boons   ·   ${r.itemsCollected || 0} Items`,
+      { fontFamily: "'Space Mono', monospace", fontSize: '11px', color: '#7a7080' }
+    ).setOrigin(0.5).setDepth(201).setScrollFactor(0).setAlpha(0);
+
+    // Best-run line
+    const bestLine = this.add.text(
+      W / 2, H * 0.39,
+      `BESTE: Welle ${newBest.wave}  ·  ${newBest.kills} Gefallen  ·  ${newBest.bossKills} Boss-Tötungen  ·  ${newBest.runs} Versuche`,
+      { fontFamily: "'Space Mono', monospace", fontSize: '11px', color: '#FFD66B', letterSpacing: 1 }
+    ).setOrigin(0.5).setDepth(201).setScrollFactor(0).setAlpha(0);
+
     // Mímir's voice
-    const mimirVoice = this.add.text(W / 2, H * 0.46, line, {
+    const mimirVoice = this.add.text(W / 2, H * 0.50, line, {
       fontFamily: "'Lora', serif", fontSize: '17px', fontStyle: 'italic',
       color: '#cc88ff', align: 'center', wordWrap: { width: W * 0.7 },
       lineSpacing: 6,
@@ -1865,7 +1991,9 @@ export default class SkaldenliedScene extends Phaser.Scene {
     });
     this.tweens.add(tlOpts(fallenTitle, 600));
     this.tweens.add(tlOpts(stats, 1200));
-    this.tweens.add(tlOpts(mimirVoice, 2200));
+    this.tweens.add(tlOpts(detail, 1500));
+    this.tweens.add(tlOpts(bestLine, 1800));
+    this.tweens.add(tlOpts(mimirVoice, 2400));
     this.tweens.add(tlOpts(memoLine, 3400));
     this.tweens.add(tlOpts(hint, 4400));
 
